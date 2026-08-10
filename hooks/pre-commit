@@ -1,0 +1,48 @@
+#!/bin/sh
+
+SWIFTFORMAT_REFORMATTED=0
+SWIFTLINT_REFORMATTED=0
+SWIFTLINT_VIOLATIONS=0
+
+echo "[PRE-COMMIT] Linting files:\n"
+GIT_DIFF=$(git diff --diff-filter=d --staged --name-only)
+
+while read FILE; do
+    if [[ "$FILE" == *\.swift ]]; then
+        # export PATH to find mint
+        export PATH="/opt/homebrew/bin:$PATH"
+
+        # SwiftFormat
+        BEFORE_SWIFTFORMAT_CHECKSUM=$(cat "$FILE" | shasum)
+        mint run swiftformat "${FILE}" --config .swiftformat &> /dev/null
+        AFTER_SWIFTFORMAT_CHECKSUM=$(cat "$FILE" | shasum)
+
+        if [[ "$BEFORE_SWIFTFORMAT_CHECKSUM" != "$AFTER_SWIFTFORMAT_CHECKSUM" ]]; then
+            echo "[PRE-COMMIT] [Warning] SwiftFormat reformatted $FILE. Please review, stage and commit."
+            ((SWIFTFORMAT_REFORMATTED++))
+        fi
+
+        # SwiftLint autocorrect
+        BEFORE_SWIFTLINT_CHECKSUM=$(cat "$FILE" | shasum)
+        mint run swiftlint lint --fix --config .swiftlint.yml --quiet "$FILE" &> /dev/null
+        AFTER_SWIFTLINT_CHECKSUM=$(cat "$FILE" | shasum)
+
+        if [[ "$BEFORE_SWIFTLINT_CHECKSUM" != "$AFTER_SWIFTLINT_CHECKSUM" ]]; then
+            echo "[PRE-COMMIT] [Warning] SwiftLint reformatted $FILE. Please review, stage and commit."
+            ((SWIFTLINT_REFORMATTED++))
+        fi
+
+        # SwiftLint
+        LINT_RESULT=$(mint run swiftlint lint --strict --config .swiftlint.yml --quiet "$FILE")
+        if [ -n "$LINT_RESULT" ]; then
+            echo "$LINT_RESULT"
+            ((SWIFTLINT_VIOLATIONS++))
+        fi
+    fi
+done <<< "$GIT_DIFF"
+
+if [ $SWIFTFORMAT_REFORMATTED -gt 0 ] || [ $SWIFTLINT_REFORMATTED -gt 0 ] || [ $SWIFTLINT_VIOLATIONS -gt 0 ]; then
+    exit 1
+fi
+
+echo "[PRE-COMMIT] Done ✅"

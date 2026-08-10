@@ -1,0 +1,35 @@
+# Helpers shared by the translation lanes. Same logic as the app repos,
+# except get_project_languages: packages have no xcodeproj, so it returns
+# the pinned PACKAGE_LANGUAGES list from the Fastfile.
+
+def get_project_languages
+  UI.header('Step: get_project_languages')
+  UI.verbose("Using pinned package languages: #{PACKAGE_LANGUAGES}")
+  PACKAGE_LANGUAGES.sort
+end
+
+def get_languages_needing_translation(string_data, target_languages, filter_translated)
+  return [] if string_data["shouldTranslate"] == false
+
+  target_languages.select do |lang|
+    if string_data.dig("localizations", lang, "variations")
+      # Check plural variations
+      variations = string_data["localizations"][lang]["variations"]
+      variations.any? do |_, variation_data|
+        variation_data.any? do |_, string_unit|
+          # When filter_translated is false, we want all strings
+          # When filter_translated is true, we only want untranslated strings
+          filter_translated ? string_unit["stringUnit"]["state"] != "translated" : true
+        end
+      end
+    else # Check regular strings
+      # When filter_translated is false, we want all strings (except those that don't exist)
+      # When filter_translated is true, we only want untranslated strings
+      if !string_data.dig("localizations", lang, "stringUnit")
+        true  # Always include if localization doesn't exist
+      else
+        filter_translated ? string_data.dig("localizations", lang, "stringUnit", "state") != "translated" : true
+      end
+    end
+  end
+end

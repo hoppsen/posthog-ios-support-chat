@@ -1,0 +1,56 @@
+# Localization workflow for the package. Mirrors the Translatefile-based
+# ChatGPT translation lanes used in our app repos:
+#
+#   bundle exec fastlane check_translations
+#   bundle exec fastlane translate
+#
+# Requires OPENAI_API_KEY in the environment.
+ruby_version '3.3.0'
+fastlane_version '2.225.0'
+default_platform(:ios)
+
+import 'Definitionsfile'
+import 'Translatefile'
+
+platform :ios do
+  desc 'Installs the tracked git hooks (pre-commit lint/format)'
+  lane :setup do
+    hooks_path = File.expand_path('../.git/hooks')
+    FileUtils.mkdir_p(hooks_path)
+    Dir[File.expand_path('../hooks/*')].each do |hook|
+      `ln -s -f "#{hook}" "#{hooks_path}"`
+      UI.message("Added \"#{File.basename(hook)}\"")
+    end
+    UI.success('Git hooks installed ✅')
+  end
+
+  desc 'Runs SwiftLint'
+  lane :lint do
+    swiftlint(
+      mode: :lint,
+      executable: 'mint run swiftlint',
+      config_file: '.swiftlint.yml',
+      strict: true,
+      quiet: true,
+    )
+  end
+
+  desc 'Runs SwiftFormat'
+  desc ' * **`lint_only`**: Returns an error instead of reformatting. Defaults to false.'
+  lane :format do |options|
+    swiftformat(
+      executable: 'mint run swiftformat',
+      config: '.swiftformat',
+      dryrun: false,
+      lint: options[:lint_only] || false,
+    )
+  end
+end
+
+# SPM packages have no xcodeproj to read knownRegions from, so the language
+# list is pinned here. Keep in sync with the apps consuming this package.
+PACKAGE_LANGUAGES = %w[
+  ar bn bg ca zh-HK zh-Hans zh-Hant hr cs da nl en-AU en-IN en-GB fi fr fr-CA
+  vi ur uk tr th te ta sv es-US es-419 es sl sk ru ro de el gu he hi hu id it
+  ja kn kk ko lt ms ml mr nb pl pt-BR pt-PT pa or
+].freeze

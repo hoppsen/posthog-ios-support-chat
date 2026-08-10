@@ -1,0 +1,360 @@
+platform :ios do
+  desc 'Check for missing translations'
+  desc '#### Example:'
+  desc "```\nbundle exec fastlane check_translations\n```"
+  desc '#### Options:'
+  desc ' * **`languages`**: Comma-separated list of language codes to check. Defaults to Xcode project languages.'
+  lane :check_translations do |options|
+    target_languages = options[:languages] ? options[:languages].split(',').map(&:strip) : get_project_languages
+
+    UI.header("Step: checking_string_catalogs")
+    missing_translations = false
+
+    # Not to include the Localizable folder containing the split files!
+    xcstrings_files = Dir.glob("../**/*.xcstrings").reject { |path| path.include?('/Localizable/') }
+    UI.message("Found #{xcstrings_files.length} xcstrings files")
+
+    xcstrings_files.each do |file_path|
+      UI.message("Checking #{file_path}")
+
+      content = JSON.parse(File.read(file_path))
+
+      content["strings"].each do |key, string_data|
+        next if string_data["shouldTranslate"] == false
+
+        languages_needing_translation = get_languages_needing_translation(string_data, target_languages, true)
+        next if languages_needing_translation.empty?
+
+        missing_translations = true
+        UI.error("`#{key}` missing translations for: #{languages_needing_translation.map(&:upcase).join(', ')}")
+      end
+    end
+
+    UI.user_error!("❌ Missing translations found!") if missing_translations
+    UI.success("✅ All translations are complete!")
+  end
+
+  desc 'Translates missing strings using ChatGPT'
+  desc '#### Example:'
+  desc "```\nbundle exec fastlane translate\n```"
+  desc '#### Options:'
+  desc ' * **`languages`**: Comma-separated list of language codes to translate to. Defaults to project languages.'
+  desc ' * **`filter_translated`**: If true, it filters out all translated strings before sending it off to ChatGPT. Defaults to true.'
+  desc ' * **`filter_reference_languages`**: Comma-separated list of language codes to include in the reference. Defaults to `en, de, sv`.'
+  desc ' * **`file`**: Path to specific .xcstrings file to translate. If not specified, processes all .xcstrings files.'
+  lane :translate do |options|
+    require 'json'
+    require 'net/http'
+    require 'uri'
+
+    # Set default languages if none provided
+    target_languages = options[:languages] ? options[:languages].split(',').map(&:strip) : get_project_languages
+    filter_translated = options.fetch(:filter_translated, true)
+    filter_reference_languages = options[:filter_reference_languages] ? options[:filter_reference_languages].split(',').map(&:strip) : ['en', 'de', 'sv']
+
+    UI.header("Step: translating_string_catalogs")
+
+    # Find xcstrings files based on options
+    xcstrings_files = if options[:file]
+      file_path = File.expand_path(options[:file], '..')
+      UI.user_error!("Specified file does not exist: #{file_path}") unless File.exist?(file_path)
+      UI.user_error!("Specified file is not an .xcstrings file: #{file_path}") unless file_path.end_with?('.xcstrings')
+      [file_path]
+    else
+      Dir.glob("../**/*.xcstrings").reject { |path| path.include?('/Localizable/') }
+    end
+
+    UI.message("Found #{xcstrings_files.length} xcstrings files")
+
+    xcstrings_files.each do |file_path|
+      UI.message("Processing #{file_path}")
+
+      # Read and parse the xcstrings file
+      content = JSON.parse(File.read(file_path))
+
+      # Create a deep copy for reference filtering so that we only send a reduced subset of languages to the API.
+      reference_content = Marshal.load(Marshal.dump(content))
+      reference_content["strings"].each do |key, string_data|
+        if string_data["localizations"]
+          string_data["localizations"] = string_data["localizations"].select { |lang, _| filter_reference_languages.include?(lang) }
+        end
+      end
+
+      # Identify which strings need translation
+      strings_needing_translation = content["strings"].select do |key, string_data|
+        next false if string_data["shouldTranslate"] == false
+        languages_needed = get_languages_needing_translation(string_data, target_languages, filter_translated)
+        if !languages_needed.empty?
+          UI.important("`#{key}` needs translation for: #{languages_needed.map(&:upcase).join(', ')}")
+        end
+        !languages_needed.empty?
+      end
+
+      next if strings_needing_translation.empty?
+      UI.message("Found #{strings_needing_translation.length} strings needing translation")
+
+      # Create a persistent HTTP client
+      uri = URI('https://api.openai.com/v1/chat/completions')
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = true
+      http.verify_mode = OpenSSL::SSL::VERIFY_PEER
+      http.read_timeout = 600
+      http.open_timeout = 60
+
+      begin
+        # Start the persistent connection
+        http.start do |connection|
+          content_array = [
+            "You are an expert iOS app localizer.",
+            "Below you will receive a complete .xcstrings file in JSON format.",
+            "Your task is as follows:",
+            "1. Translate ONLY the following keys into #{target_languages.sort.join(', ')}:",
+            strings_needing_translation.keys.map { |k| "- #{k}" }.join("\n"),
+            "2. Use the comments provided for context on where and how the string is used.",
+            "3. Analyze existing translations to maintain consistent tone and terminology. If you're uncertain about the style, use a relatively casual and friendly tone.",
+            "4. Keep translation lengths proportional to the source strings to maintain UI layout.",
+            "5. For regular strings, return the translation in this format:",
+            "   {",
+            "     \"<KEY>\": {",
+            "       \"localizations\": {",
+            "         \"<LANGUAGE_CODE>\": {",
+            "           \"stringUnit\": {",
+            "             \"state\": \"translated\",",
+            "             \"value\": \"<TRANSLATED_TEXT>\"",
+            "           }",
+            "         },",
+            "         ... other languages",
+            "       }",
+            "     }",
+            "   }",
+            "6. For plural strings with variations, return the translation in this format:",
+            "   {",
+            "     \"<KEY>\": {",
+            "       \"localizations\": {",
+            "         \"<LANGUAGE_CODE>\": {",
+            "           \"variations\": {",
+            "             \"plural\": {",
+            "               \"one\": {",
+            "                 \"stringUnit\": {",
+            "                   \"state\": \"translated\",",
+            "                   \"value\": \"<TRANSLATED_TEXT_FOR_ONE>\"",
+            "                 }",
+            "               },",
+            "               \"other\": {",
+            "                 \"stringUnit\": {",
+            "                   \"state\": \"translated\",",
+            "                   \"value\": \"<TRANSLATED_TEXT_FOR_OTHER>\"",
+            "                 }",
+            "               }",
+            "               // Include additional plural categories if needed",
+            "             }",
+            "           }",
+            "         },",
+            "         ... other languages",
+            "       }",
+            "     }",
+            "   }",
+            "   Please note: the returned JSON must include the \"localizations\" block even for plural variations.",
+            "   Some languages have more than one plural variation, so make sure to include all of them where applicable. (e.g. few, many, one, other, two, zero, etc.)",
+            "   Also, inside each \"stringUnit\", the \"state\" key must appear before the \"value\" key.",
+            "7. Return ONLY a valid JSON object containing ONLY the translated keys with their updated localization entries—do not include any extra commentary or text.",
+            "Here is the reference .xcstrings file (filtered to the following languages: #{filter_reference_languages.join(', ')}):",
+            JSON.pretty_generate(reference_content)
+          ]
+
+          messages = [{
+            "role": "user",
+            "content": content_array.join("\n")
+          }]
+
+          request = Net::HTTP::Post.new(uri)
+          request['Authorization'] = "Bearer #{ENV['OPENAI_API_KEY']}"
+          request['Content-Type'] = 'application/json'
+          request.body = JSON.generate({
+            "model": "gpt-5-mini",
+            "messages": messages
+          })
+
+          UI.message("Sending translation request for #{file_path}...")
+          response = connection.request(request)
+
+          if response.code != "200"
+            UI.error("ChatGPT API call failed: #{response.body}")
+            next
+          end
+
+          response_body = response.body
+          parsed_output = JSON.parse(response_body)
+          content_string = nil
+
+          if parsed_output["choices"] && parsed_output["choices"][0]["message"]["content"]
+            # Clean up the markdown formatting if present
+            content_string = parsed_output["choices"][0]["message"]["content"]
+              .gsub(/```json\n/, '')  # Remove opening ```json
+              .gsub(/\n```$/, '')     # Remove closing ```
+
+            UI.verbose("Translation response: #{content_string}")
+
+            # Merge translations into existing content
+            translations = JSON.parse(content_string)
+
+            # Handle both direct translations and nested "strings" format
+            translation_data = translations["strings"] || translations
+            translation_data.each do |key, data|
+              UI.verbose("Processing key: #{key}")
+              next unless content["strings"][key]  # Skip if key doesn't exist
+              next unless data && data["localizations"] # Skip if no localizations
+
+              # Get existing localizations
+              existing_localizations = content["strings"][key]["localizations"] || {}
+
+              UI.verbose("Existing localizations: #{existing_localizations.inspect}")
+              UI.verbose("Translation data: #{data.inspect}")
+
+              # Merge new translations while preserving English
+              merged_localizations = existing_localizations.merge(data["localizations"]) do |lang, old, new|
+                UI.verbose("Merging #{lang}: #{old.inspect} with #{new.inspect}")
+                lang == "en" ? old : new
+              end
+
+              # Update with merged localizations
+              content["strings"][key]["localizations"] = merged_localizations
+            end
+
+            # Custom JSON formatter to match Apple's style
+            formatted_json = JSON.pretty_generate(content)
+              .gsub(/":/, '" :')  # Add space before colon
+
+            # Write the updated content back to file
+            File.write(file_path, formatted_json)
+            UI.success("✅ Updated translations written to #{file_path}")
+          else
+            UI.error("❌ Unexpected response format: #{parsed_output}")
+          end
+        end
+      rescue JSON::ParserError => e
+        UI.error("❌ Failed to parse translation response: #{e.message}")
+        UI.error("❌ Content that failed to parse: #{content_string || 'No content available'}")
+      rescue Net::ReadTimeout => e
+        UI.error("❌ Request timed out: #{e.message}")
+      rescue StandardError => e
+        UI.error("❌ Error during API call: #{e.message}")
+      end
+    end
+  end
+
+  desc 'Translates missing strings using ChatGPT in batches of 4 languages'
+  desc '#### Example:'
+  desc "```\nbundle exec fastlane translate_batch languages:fr,es,it,de,nl,pt,ja,ko\n```"
+  desc '#### Options:'
+  desc ' * **`languages`**: Comma-separated list of language codes to translate to (will be processed in batches). Defaults to project languages.'
+  desc ' * **`filter_translated`**: If true, it filters out all translated strings before sending it off to ChatGPT. Defaults to true.'
+  desc ' * **`filter_reference_languages`**: Comma-separated list of language codes to include in the reference. Defaults to `en, de, sv`.'
+  desc ' * **`file`**: Path to specific .xcstrings file to translate. If not specified, processes all .xcstrings files.'
+  desc ' * **`batch_size`**: Number of languages to process in each batch. Defaults to 3.'
+  lane :translate_batch do |options|
+    # Get languages from options or fall back to project languages
+    all_languages = options[:languages] ? options[:languages].split(',').map(&:strip) : get_project_languages
+    batch_size = options[:batch_size]&.to_i || 3
+
+    # Create batches of languages
+    language_batches = all_languages.each_slice(batch_size).to_a
+
+    UI.important("Will process #{all_languages.length} languages in #{language_batches.length} batches of up to #{batch_size} languages each")
+
+    # Process each batch
+    language_batches.each_with_index do |batch_languages, index|
+      UI.header("Processing batch #{index + 1} of #{language_batches.length}: #{batch_languages.join(', ')}")
+
+      # Call the original translate lane with the current batch of languages
+      translate(
+        languages: batch_languages.join(','),
+        filter_translated: options.fetch(:filter_translated, true),
+        filter_reference_languages: options.fetch(:filter_reference_languages, ['en', 'de', 'sv'].join(',')),
+        file: options.fetch(:file, nil)
+      )
+
+      # Add a small delay between batches to avoid rate limiting
+      if index < language_batches.length - 1
+        UI.message("Waiting 5 seconds before processing next batch...")
+        sleep(5)
+      end
+    end
+
+    UI.success("✅ Completed translation of all #{all_languages.length} languages")
+  end
+
+  desc 'Removes specified languages from all xcstrings files'
+  desc '#### Example:'
+  desc "```\nbundle exec fastlane remove_language languages:fr,es,it\n```"
+  desc '#### Options:'
+  desc ' * **`languages`**: Comma-separated list of language codes to remove (required).'
+  desc ' * **`file`**: Path to specific .xcstrings file to process. If not specified, processes all .xcstrings files.'
+  lane :remove_language do |options|
+    require 'json'
+    require 'fileutils'
+
+    UI.header("Step: removing_language")
+
+    languages_to_remove = options[:languages] ? options[:languages].split(',').map(&:strip) : []
+    UI.user_error!("No languages specified. Use languages:fr,es,it") if languages_to_remove.empty?
+
+    UI.message("Removing languages: #{languages_to_remove.join(', ')}")
+
+    # Find xcstrings files based on options
+    xcstrings_files = if options[:file]
+      file_path = File.expand_path(options[:file], '..')
+      UI.user_error!("Specified file does not exist: #{file_path}") unless File.exist?(file_path)
+      UI.user_error!("Specified file is not an .xcstrings file: #{file_path}") unless file_path.end_with?('.xcstrings')
+      [file_path]
+    else
+      Dir.glob("../**/*.xcstrings").reject { |path| path.include?('/Localizable/') }
+    end
+
+    UI.message("Found #{xcstrings_files.length} xcstrings files")
+
+    total_removed = 0
+    xcstrings_files.each do |file_path|
+      UI.message("Processing #{file_path}")
+
+      content = JSON.parse(File.read(file_path))
+      file_removed_count = 0
+
+      content["strings"].each do |key, string_data|
+        next unless string_data["localizations"]
+
+        # Remove specified languages from localizations
+        languages_to_remove.each do |lang|
+          if string_data["localizations"].key?(lang)
+            string_data["localizations"].delete(lang)
+            file_removed_count += 1
+            UI.verbose("Removed #{lang} from key: #{key}")
+          end
+        end
+
+        # Clean up empty localizations
+        if string_data["localizations"].empty?
+          string_data.delete("localizations")
+        end
+      end
+
+      if file_removed_count > 0
+        # Write the updated content back to file with proper formatting
+        formatted_json = JSON.pretty_generate(content)
+          .gsub(/":/, '" :')  # Add space before colon to match Apple's style
+
+        File.write(file_path, formatted_json)
+        UI.success("✅ Removed #{file_removed_count} language entries from #{file_path}")
+        total_removed += file_removed_count
+      else
+        UI.message("No specified languages found in #{file_path}")
+      end
+    end
+
+    if total_removed > 0
+      UI.success("🎉 Successfully removed #{total_removed} language entries across #{xcstrings_files.length} files")
+    else
+      UI.message("No language entries were removed")
+    end
+  end
+end

@@ -1,0 +1,34 @@
+# file options
+
+--exclude **/.build,**/Package.swift,vendor/bundle,fastlane
+
+# format options
+--swiftversion 5.5
+
+## elseOnSameLine
+--guardelse same-line
+
+## wrap
+--maxwidth 160
+
+## wrapArguments
+--wraparguments after-first
+--wrapparameters after-first
+--wrapcollections after-first
+--wrapconditions after-first
+
+## organizeDeclarations
+--categorymark "MARK: - %c"
+--structthreshold 9999
+--classthreshold 9999
+--enumthreshold 100
+--extensionlength 100
+
+# rules
+
+--enable isEmpty, organizeDeclarations
+--disable enumNamespaces, wrapMultilineStatementBraces
+
+# Interesting rules
+# --enable organizeDeclarations
+# --enable sortedSwitchCases

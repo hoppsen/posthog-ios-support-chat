@@ -1,0 +1,44 @@
+excluded: # paths to ignore during linting. Takes precedence over `included`.
+  - .build
+  - vendor/bundle
+  - fastlane
+large_tuple:
+  warning: 3
+  error: 5
+line_length: 160
+identifier_name:
+  allowed_symbols:
+    - _ # Used in SwiftUI
+  min_length: 3
+  excluded:
+    - id
+    - ok # Okay
+    - 'no' # Yes/No
+    - to # From -> To
+    - ai # MessageAuthorType.ai
+    - us # PostHog US cloud
+    - eu # PostHog EU cloud
+type_name:
+  allowed_symbols:
+    - _ # Used in SwiftUI
+file_length:
+  warning: 500
+  error: 750
+nesting:
+  type_level:
+    warning: 2
+  function_level:
+    warning: 5
+private_outlet:
+  allow_private_set: true
+opt_in_rules:
+  - private_outlet
+disabled_rules:
+  - trailing_comma
+  # Only disable if not possible otherwise:
+  # - type_body_length
+  # - function_parameter_count
+  # - function_body_length
+  # - file_length
+  # - large_tuple
+  # - type_name
