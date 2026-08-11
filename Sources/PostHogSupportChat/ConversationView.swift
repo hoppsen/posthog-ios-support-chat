@@ -4,13 +4,23 @@ import SwiftUI
 /// The message thread + composer for the active ticket.
 struct ConversationView: View {
     let client: SupportChatClient
-    var greetingOverride: String?
+    var strings: SupportChatStrings = .init()
     @State private var draft = ""
     @FocusState private var composerFocused: Bool
 
-    private static var placeholderFallback: String {
-        String(localized: "Type your message...", bundle: .module,
-               comment: "Placeholder of the chat message input field. Fallback when the project config does not provide one.")
+    private var placeholder: String {
+        let fallback = LocalizedStringResource("Type your message...",
+                                               bundle: .package,
+                                               comment: "Placeholder of the chat message input field.")
+        return SupportChatStrings.string(strings.placeholder,
+                                         dashboard: client.remoteConfig?.placeholderText,
+                                         fallback: fallback)
+    }
+
+    private var greeting: Text {
+        SupportChatStrings.text(strings.greeting,
+                                dashboard: client.remoteConfig?.greetingText,
+                                fallback: .packageGreeting)
     }
 
     var body: some View {
@@ -60,8 +70,7 @@ struct ConversationView: View {
                 VStack(spacing: 12) {
                     // Greeting only belongs to a fresh conversation — an
                     // existing thread that is still loading would flash it.
-                    if client.messages.isEmpty, client.currentTicketId == nil,
-                       let greeting = greetingOverride ?? client.remoteConfig?.greetingText {
+                    if client.messages.isEmpty, client.currentTicketId == nil {
                         GreetingBubble(text: greeting)
                     }
                     ForEach(client.messages) { message in
@@ -97,7 +106,7 @@ struct ConversationView: View {
 
     private var composer: some View {
         HStack(alignment: .bottom, spacing: 8) {
-            TextField(client.remoteConfig?.placeholderText ?? Self.placeholderFallback,
+            TextField(placeholder,
                       text: $draft,
                       axis: .vertical)
                 .lineLimit(1 ... 5)
@@ -152,7 +161,7 @@ struct MessageBubble: View {
                 Text(TipTapRenderer.render(message))
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .background(isCustomer ? Color.accentColor : Color(.systemGray5))
+                    .background(isCustomer ? AnyShapeStyle(.tint) : AnyShapeStyle(Color(.systemGray5)))
                     .foregroundStyle(isCustomer ? .white : .primary)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
             }
@@ -162,11 +171,11 @@ struct MessageBubble: View {
 }
 
 struct GreetingBubble: View {
-    let text: String
+    let text: Text
 
     var body: some View {
         HStack {
-            Text(text)
+            text
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .background(Color(.systemGray5))

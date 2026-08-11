@@ -6,7 +6,7 @@ import SwiftUI
 struct TicketListView: View {
     let client: SupportChatClient
     @Binding var path: [SupportRoute]
-    var greetingOverride: String?
+    var strings: SupportChatStrings = .init()
 
     var body: some View {
         List {
@@ -35,12 +35,12 @@ struct TicketListView: View {
         VStack(spacing: 14) {
             Image(systemName: "bubble.left.and.bubble.right.fill")
                 .font(.system(size: 44))
-                .foregroundStyle(Color.accentColor.gradient)
+                .foregroundStyle(.tint)
                 .accessibilityHidden(true)
 
-            ((greetingOverride ?? client.remoteConfig?.greetingText).map(Text.init)
-                ?? Text("How can we help you today?", bundle: .module,
-                        comment: "Headline above the support conversation list. Fallback when the project config does not provide a greeting."))
+            SupportChatStrings.text(strings.greeting,
+                                    dashboard: client.remoteConfig?.greetingText,
+                                    fallback: .packageGreeting)
                 .font(.title3.bold())
                 .multilineTextAlignment(.center)
 
@@ -93,7 +93,7 @@ struct TicketRow: View {
                 Text("\(unread)")
                     .font(.caption2.bold())
                     .padding(6)
-                    .background(Color.accentColor, in: Circle())
+                    .background(.tint, in: Circle())
                     .foregroundStyle(.white)
             }
         }

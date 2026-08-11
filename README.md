@@ -66,6 +66,33 @@ Refresh the unread badge on app foreground:
 try? await supportChat.refreshTickets()   // supportChat.unreadCount
 ```
 
+### Copy and localization
+
+Every user-facing string resolves in this order:
+
+```
+strings: parameter (your app)  →  PostHog dashboard  →  the package's translations
+```
+
+The package ships its own strings in 54 languages, but **dashboard strings are single-value** — PostHog stores no translations for them — so a dashboard greeting appears in one language for every user, next to an otherwise localized UI. A localized app should pass its own copy instead:
+
+```swift
+SupportChatView(
+    client: supportChat,
+    strings: .init(
+        greeting: LocalizedStringResource("Hi! How can we help?", comment: "Support chat greeting"),
+        placeholder: LocalizedStringResource("Type your message…", comment: "Support chat input"),
+        identificationTitle: LocalizedStringResource("Before we start…", comment: "Support email form title"),
+        identificationDescription: LocalizedStringResource("Add your email so we can get back to you.",
+                                                           comment: "Support email form description")
+    )
+)
+```
+
+`LocalizedStringResource` resolves at display time, so these follow an in-app language switcher. Leaving `strings` empty is fine too — the dashboard values (or the bundled translations) are used, which is the zero-configuration path.
+
+The chat follows the host app's tint, so wrap it in `.tint(…)` if your app sets its accent programmatically rather than through the asset catalog.
+
 ### Mirroring chat activity into your analytics
 
 PostHog captures an internal `$conversation_ticket_created` event server-side, but it is **personless** — workflows keyed on it cannot use person properties. The client's `onEvent` hook lets your app capture its own events with full person processing, which is the right trigger for person-based workflows (e.g. "notify me with the customer's context when a ticket is created"):
