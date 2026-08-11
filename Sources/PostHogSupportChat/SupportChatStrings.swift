@@ -3,13 +3,13 @@ import SwiftUI
 
 /// App-supplied copy for the chat's user-facing strings.
 ///
-/// Each value wins over the matching string configured in the PostHog
-/// dashboard, which in turn wins over the package's bundled translations.
+/// Anything set here wins. Anything left `nil` falls back to the package's
+/// translations, which ship in 54 languages — or, if the configuration opts
+/// into `usesDashboardStrings`, to the PostHog dashboard's copy first.
 ///
-/// Dashboard strings are single-value — PostHog stores no translations for
-/// them — so an app shipping in more than one language should pass its own
-/// `LocalizedStringResource`s here. They resolve at display time against the
-/// current locale, so they also follow an in-app language switcher.
+/// Values resolve at display time against the current locale, so they follow
+/// an in-app language switcher rather than freezing at the locale that was
+/// active when they were constructed.
 public struct SupportChatStrings: Sendable {
     /// Headline above the conversation list and the opening bubble of a new
     /// conversation.
@@ -33,8 +33,11 @@ public struct SupportChatStrings: Sendable {
 }
 
 extension SupportChatStrings {
-    /// Resolves app override → dashboard value → bundled translation.
-    /// Dashboard values are server data, so they are never treated as keys.
+    /// Resolves app override → dashboard value → bundled translation. The
+    /// dashboard tier is `nil` unless the configuration opts into it, so the
+    /// usual chain is just override → translation.
+    ///
+    /// Dashboard values are server data and never treated as localization keys.
     static func text(_ override: LocalizedStringResource?,
                      dashboard: String?,
                      fallback: LocalizedStringResource) -> Text {
@@ -44,7 +47,8 @@ extension SupportChatStrings {
     }
 
     /// Same precedence, for APIs that need a plain `String` (e.g. a
-    /// `TextField` placeholder). Still resolved at render time.
+    /// `TextField` placeholder). Still resolved at render time, so it also
+    /// follows a locale change.
     static func string(_ override: LocalizedStringResource?,
                        dashboard: String?,
                        fallback: LocalizedStringResource) -> String {
