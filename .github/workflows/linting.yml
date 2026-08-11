@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Read version from Mintfile
         run: echo "SWIFTLINT_VERSION=$(awk '/SwiftLint/ {split($0, a, "@"); print a[2]}' Mintfile)" >> $GITHUB_ENV
       - uses: actions/cache@v4
@@ -49,7 +49,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Read version from Mintfile
         run: echo "SWIFTFORMAT_VERSION=$(awk '/SwiftFormat/ {split($0, a, "@"); print a[2]}' Mintfile)" >> $GITHUB_ENV
       - uses: actions/cache@v4
