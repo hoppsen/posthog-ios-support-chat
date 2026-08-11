@@ -666,6 +666,336 @@
         }
       }
     },
+    "Add your name so we know who we are talking to." : {
+      "comment" : "Description of the optional form asking only for a name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أضف اسمك حتى نعرف مع من نتحدث."
+          }
+        },
+        "bg" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Добавете името си, за да знаем с кого говорим."
+          }
+        },
+        "bn" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "আপনার নাম যোগ করুন যাতে আমরা জানতে পারি কার সঙ্গে কথা বলছি।"
+          }
+        },
+        "ca" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afegeix el teu nom perquè sapiguem amb qui parlem."
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uveďte své jméno, abychom věděli, s kým mluvíme."
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tilføj dit navn, så vi ved, hvem vi taler med."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gib deinen Namen an, damit wir wissen, mit wem wir sprechen."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Προσθέστε το όνομά σας, ώστε να ξέρουμε με ποιον μιλάμε."
+          }
+        },
+        "en-AU" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add your name so we know who we're talking to."
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add your name so we know who we're talking to."
+          }
+        },
+        "en-IN" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add your name so we know who we're talking to."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añade tu nombre para que sepamos con quién hablamos."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agrega tu nombre para que sepamos con quién hablamos."
+          }
+        },
+        "es-US" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agrega tu nombre para que sepamos con quién hablamos."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lisää nimesi, jotta tiedämme, kenelle puhumme."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indiquez votre nom pour que nous sachions à qui nous parlons."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indiquez votre nom pour qu'on sache à qui on parle."
+          }
+        },
+        "gu" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "અમને ખબર રહે તે માટે તમારું નામ દાખલ કરો."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "הזן את שמך כדי שנדע עם מי אנחנו מדברים."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "अपना नाम जोड़ें ताकि हमें पता चले हम किससे बात कर रहे हैं।"
+          }
+        },
+        "hr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dodajte svoje ime kako bismo znali s kim razgovaramo."
+          }
+        },
+        "hu" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add meg a neved, hogy tudjuk, kivel beszélünk."
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tambahkan nama Anda agar kami tahu dengan siapa kami berbicara."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inserisci il tuo nome così sappiamo con chi stiamo parlando."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "誰と話しているか分かるように、お名前を入力してください。"
+          }
+        },
+        "kk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Кіммен сөйлесіп жатқанымызды білу үшін атыңызды енгізіңіз."
+          }
+        },
+        "kn" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ನಾವು ಯಾರೊಂದಿಗೆ ಮಾತನಾಡುತ್ತಿದ್ದೇವೆ ಎಂದು ತಿಳಿಯಲು ನಿಮ್ಮ ಹೆಸರನ್ನು ನಮೂದಿಸಿ."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "누구와 이야기하는지 알 수 있도록 이름을 입력해 주세요."
+          }
+        },
+        "lt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Įrašykite savo vardą, kad žinotume, su kuo kalbame."
+          }
+        },
+        "ml" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "നമുക്കിതാരുമായി സംസാരിക്കുകയാണെന്ന് അറിയാൻ നിങ്ങളുടെ പേര് ചേർക്കുക."
+          }
+        },
+        "mr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "आपले नाव जोडा, म्हणजे आम्हाला कोणाशी बोलत आहोत ते समजू शकेल."
+          }
+        },
+        "ms" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tambah nama anda supaya kami tahu dengan siapa kami bercakap."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Legg til navnet ditt slik at vi vet hvem vi snakker med."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voeg je naam toe zodat we weten met wie we praten."
+          }
+        },
+        "or" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ଆମେ କାହା ସହିତ କଥାହେଉଛୁ ବୁଝିବାକୁ ଆପଣଙ୍କର ନାମ ଯୋଗ କରନ୍ତୁ।"
+          }
+        },
+        "pa" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ਅਸੀਂ ਕਿਸ ਨਾਲ ਗੱਲ ਕਰ ਰਹੇ ਹਾਂ ਇਹ ਜਾਣਨ ਲਈ ਆਪਣਾ ਨਾਮ ਜੋੜੋ।"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dodaj swoje imię, abyśmy wiedzieli, z kim rozmawiamy."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicione seu nome para sabermos com quem estamos falando."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicione o seu nome para sabermos com quem estamos a falar."
+          }
+        },
+        "ro" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adăugați numele dvs. ca să știm cu cine vorbim."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Укажите своё имя, чтобы мы знали, с кем общаемся."
+          }
+        },
+        "sk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pridajte svoje meno, aby sme vedeli, s kým hovoríme."
+          }
+        },
+        "sl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vnesi svoje ime, da bomo vedeli, s kom govorimo."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ange ditt namn så att vi vet vem vi pratar med."
+          }
+        },
+        "ta" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "நாம் யாருடன் பேசுகிறோமென்று அறிய உங்கள் பெயரைச் சேர்க்கவும்."
+          }
+        },
+        "te" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "మేము ఎవరితో మాట్లాడుతున్నామో తెలుసుకోడానికి మీ పేరు నమోదు చేయండి."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "เพิ่มชื่อของคุณเพื่อให้เรารู้ว่าเรากำลังคุยกับใคร"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kiminle konuştuğumuzu bilmek için adınızı ekleyin."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Додайте своє ім’я, щоб ми знали, з ким спілкуємося."
+          }
+        },
+        "ur" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ہمیں معلوم ہو کہ ہم کس سے بات کر رہے ہیں، اپنا نام بتائیں۔"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thêm tên của bạn để chúng tôi biết đang nói chuyện với ai."
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增你的姓名，讓我們知道正在與誰對話。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加您的姓名，以便我们知道在与谁对话。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增您的姓名，以便我們知道正在與誰對話。"
+          }
+        }
+      }
+    },
     "Before we start..." : {
       "comment" : "Header of the form asking for the user's email before the first support message. Fallback when the project config does not provide one.",
       "extractionState" : "manual",
