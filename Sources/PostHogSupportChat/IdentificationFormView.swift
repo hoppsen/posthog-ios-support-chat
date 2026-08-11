@@ -22,9 +22,22 @@ struct IdentificationFormView: View {
     }
 
     private var explanation: Text {
-        let bundled = LocalizedStringResource("Add your email so we can get back to you.",
-                                              bundle: .package,
-                                              comment: "Description of the optional email form, explaining the email is used to reply to the user.")
+        // The form shows only the fields the project collects, so the copy has
+        // to promise exactly what is being asked for.
+        let bundled = switch (client.asksForEmail, client.asksForName) {
+        case (true, true):
+            LocalizedStringResource("Add your details so we can get back to you.",
+                                    bundle: .package,
+                                    comment: "Description of the optional form asking for email and name, explaining they are used to reply to the user.")
+        case (false, true):
+            LocalizedStringResource("Add your name so we know who we are talking to.",
+                                    bundle: .package,
+                                    comment: "Description of the optional form asking only for a name.")
+        default:
+            LocalizedStringResource("Add your email so we can get back to you.",
+                                    bundle: .package,
+                                    comment: "Description of the optional email form, explaining the email is used to reply to the user.")
+        }
         return SupportChatStrings.text(strings.identificationDescription,
                                        bundled: bundled,
                                        dashboard: client.dashboardIdentificationDescription)
