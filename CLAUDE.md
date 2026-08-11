@@ -106,9 +106,11 @@ start from them if you re-add it.
 UI strings live in `Sources/PostHogSupportChat/Resources/Localizable.xcstrings`
 (54 languages). `bundle: .module` is required on every `Text`/`String(localized:)`.
 Translation workflow: `bundle exec fastlane translate_batch` (see README).
-Strings configurable in the PostHog dashboard (greeting, placeholder,
-identification form texts) always take precedence over bundled fallbacks —
-only fallbacks need localizing here.
+These translations are what the chat renders by default. Host apps can pass
+their own copy through `SupportChatStrings`, which wins; the dashboard's
+greeting, placeholder, and identification texts participate only when a
+project sets `usesDashboardStrings` — they are single-value, so they are off
+by default and would otherwise defeat these translations entirely.
 
 ## Testing
 

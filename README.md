@@ -66,6 +66,58 @@ Refresh the unread badge on app foreground:
 try? await supportChat.refreshTickets()   // supportChat.unreadCount
 ```
 
+### Copy and localization
+
+Every user-facing string resolves in this order:
+
+```
+strings: parameter (your app)  →  the package's translations (54 languages)
+```
+
+Copy configured in the PostHog dashboard is skipped unless you opt in, in which case it slots in between:
+
+```
+strings: parameter  →  PostHog dashboard  →  the package's translations
+```
+
+That default is deliberate. Enabling Support pre-fills the dashboard fields with English defaults (`Hey, how can I help you today?`, `Type your message...`, …), and **PostHog stores no translations for them** — unlike surveys. Using them would show English to every user regardless of locale, in place of the translations this package exists to provide. Left alone, those fields stay free to configure a web widget independently.
+
+Override only what you want to word yourself:
+
+```swift
+SupportChatView(
+    client: supportChat,
+    strings: .init(
+        greeting: LocalizedStringResource("Hi! How can we help?", comment: "Support chat greeting"),
+        placeholder: LocalizedStringResource("Type your message…", comment: "Support chat input"),
+        identificationTitle: LocalizedStringResource("Before we start…", comment: "Support email form title"),
+        identificationDescription: LocalizedStringResource("Add your email so we can get back to you.",
+                                                           comment: "Support email form description")
+    )
+)
+```
+
+`LocalizedStringResource` resolves at display time, so these follow an in-app language switcher; in an app they default to the main bundle, so Xcode extraction and existing translation tooling pick them up.
+
+### Using the dashboard copy instead
+
+```swift
+SupportChatConfiguration(projectApiKey: "phc_...", usesDashboardStrings: true)
+```
+
+Worth it for a single-language app that wants to reword the greeting without shipping a release, or to keep an iOS chat and a web widget identical. The trade is the one above: whatever is typed in the dashboard is what every user sees, in that one language. Anything you pass in `strings:` still wins, and the bundled translations still fill fields the dashboard leaves empty.
+
+### Tint
+
+The chat draws itself in the environment tint, so it picks up your app's accent with no configuration — and you can override it per presentation:
+
+```swift
+SupportChatView(client: supportChat)
+    .tint(.brandGreen)
+```
+
+One caveat if you present the chat in its own `UIWindow` (see below): a new window starts a fresh SwiftUI environment, so a `.tint(…)` applied to your app's root view does **not** reach it. It falls back to the `AccentColor` asset, which is the system blue if you set your accent programmatically instead. Apply `.tint(…)` to the `SupportChatView` you put in the window.
+
 ### Mirroring chat activity into your analytics
 
 PostHog captures an internal `$conversation_ticket_created` event server-side, but it is **personless** — workflows keyed on it cannot use person properties. The client's `onEvent` hook lets your app capture its own events with full person processing, which is the right trigger for person-based workflows (e.g. "notify me with the customer's context when a ticket is created"):
@@ -101,9 +153,14 @@ func presentFeedbackChat(in scene: UIWindowScene) {
     window.rootViewController = UIViewController()
     window.makeKeyAndVisible()
 
-    let chat = SupportChatView(client: supportChat,
-                               startNewConversation: true,   // straight into a fresh conversation
-                               greeting: "We read every message. What can we do better?")
+    let chat = SupportChatView(
+        client: supportChat,
+        startNewConversation: true,   // straight into a fresh conversation
+        strings: .init(greeting: LocalizedStringResource("We read every message. What can we do better?",
+                                                         comment: "Support chat greeting for the feedback action"))
+    )
+    .tint(.brandGreen)   // a new window does not inherit the app's environment tint
+
     let host = DismissReportingHostingController(rootView: chat)
     host.onDismiss = { dismissOverlay() }
     overlayWindow = window
@@ -142,7 +199,7 @@ private final class DismissReportingHostingController<Content: View>: UIHostingC
 - **Auth:** the public conversations token is fetched from PostHog's remote config (`/array/<projectApiKey>/config` → `conversations.token`) and sent as `X-Conversations-Token`. No secret keys on device.
 - **Allowed domains:** if your project's Support settings restrict allowed domains, pass one of them as `origin` in the configuration — write endpoints reject native requests without an allowlisted `Origin` header. With an empty domain list, leave it nil.
 - **Access control:** a client-generated `widget_session_id` (stored in the **Keychain**, so ticket history survives app reinstalls) scopes all ticket access; wrong ids get 403.
-- **Identity:** designed for anonymous users. With `requireEmail` enabled in the dashboard, an email is *asked for* once per session before the first message — declining is allowed and remembered for the session. When provided it is sent as a trait: it labels tickets, enables PostHog's email reply notifications, and serves as the recovery key.
+- **Identity:** designed for anonymous users. With `requireEmail` enabled in the dashboard, an email is *asked for* once per session before the first message — declining is allowed and remembered for the session. When provided it is sent as a trait: it labels tickets in your inbox and enables PostHog's email reply notifications.
 - **New messages:** sent messages are echoed locally from the send response; incoming replies arrive via polling while the conversation is on screen (2s default, configurable via `pollInterval`), plus refresh on demand. No push — use PostHog's email notifications for async replies until [Workflows push notifications](https://github.com/PostHog/posthog/issues/45009) ship for iOS.
 - **Device moves:** not covered — the Keychain-stored session survives reinstalls on the same device, which is the common case for anonymous users. PostHog's email-based ticket recovery is currently web-oriented; see `CLAUDE.md` for the verified protocol details if you want to build on it.
 
@@ -157,11 +214,11 @@ All under the ingestion host (`https://us.i.posthog.com` / `eu.i.posthog.com`), 
 | `POST /api/conversations/v1/widget/messages/{id}/read` | Mark read |
 | `GET /api/conversations/v1/widget/tickets` | Ticket list with unread counts |
 
-Messages support rich text as TipTap JSON (`rich_content`), rendered to `AttributedString` by `TipTapRenderer` with a plain-text fallback.
+Messages carry rich text as TipTap JSON (`rich_content`), rendered to `AttributedString` by `TipTapRenderer`. Replies sent from the PostHog inbox arrive as markdown in `content` instead, which the same renderer parses, falling back to plain text.
 
 ## Development
 
-Tooling mirrors our app repos: [Mint](https://github.com/yonaskolb/Mint)-pinned SwiftFormat + SwiftLint, fastlane lanes, a pre-commit hook, and GitHub Actions for linting and tests.
+Tooling mirrors our app repos: [Mint](https://github.com/yonaskolb/Mint)-pinned SwiftFormat + SwiftLint, fastlane lanes, a pre-commit hook, and GitHub Actions for linting, tests, and a Release build for a generic iOS device.
 
 ```bash
 bundle install
@@ -179,7 +236,7 @@ bundle exec fastlane check_translations   # fail on missing translations
 bundle exec fastlane translate_batch      # translate missing strings via ChatGPT
 ```
 
-Strings configurable in the PostHog dashboard (greeting, placeholder, identification form texts) always take precedence over the bundled fallbacks.
+These translations are what the chat shows by default. Copy passed by the host app in `strings:` wins over them, and dashboard copy only participates when a project opts into `usesDashboardStrings` — see [Copy and localization](#copy-and-localization).
 
 ## Status
 

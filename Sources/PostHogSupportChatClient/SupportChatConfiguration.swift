@@ -29,6 +29,18 @@ public struct SupportChatConfiguration: Sendable {
     public let host: Host
     /// Interval for polling new messages while a conversation is on screen.
     public let pollInterval: TimeInterval
+    /// Whether copy configured in the PostHog dashboard (greeting,
+    /// placeholder, identification form texts) is used at all.
+    ///
+    /// Off by default. Enabling Support pre-fills those fields with English
+    /// defaults, and PostHog stores no translations for them — so using them
+    /// would show English to every user regardless of locale, in place of the
+    /// translations this package ships. Left off, the dashboard fields belong
+    /// to the web widget alone.
+    ///
+    /// Turn it on for a single-language app that wants to edit copy without
+    /// shipping a release, or to match a web widget word for word.
+    public let usesDashboardStrings: Bool
     /// Origin to send with every request (e.g. `https://example.com`).
     /// Required when the PostHog project's Support settings restrict allowed
     /// domains: write endpoints reject requests whose `Origin` is missing or
@@ -39,11 +51,13 @@ public struct SupportChatConfiguration: Sendable {
     public init(projectApiKey: String,
                 host: Host = .us,
                 pollInterval: TimeInterval = 2,
-                origin: URL? = nil) {
+                origin: URL? = nil,
+                usesDashboardStrings: Bool = false) {
         self.projectApiKey = projectApiKey
         self.host = host
         self.pollInterval = max(1, pollInterval)
         self.origin = origin
+        self.usesDashboardStrings = usesDashboardStrings
     }
 }
 

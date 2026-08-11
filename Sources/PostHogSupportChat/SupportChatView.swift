@@ -23,7 +23,7 @@ enum SupportRoute: Hashable {
 public struct SupportChatView: View {
     private let client: SupportChatClient
     private let startNewConversation: Bool
-    private let greeting: String?
+    private let strings: SupportChatStrings
     @State private var path: [SupportRoute] = []
     @State private var showIdentificationForm = false
     @State private var didAutoOpen = false
@@ -42,13 +42,17 @@ public struct SupportChatView: View {
     ///     (the list stays behind the back button) instead of auto-opening
     ///     the most recent active ticket. Use for entry points whose intent
     ///     is "start a new conversation", e.g. a feedback action.
-    ///   - greeting: overrides the dashboard-configured greeting in the
-    ///     conversation-list header and the empty conversation bubble —
-    ///     lets entry points set their own tone (e.g. a feedback action).
-    public init(client: SupportChatClient, startNewConversation: Bool = false, greeting: String? = nil) {
+    ///   - strings: copy for this presentation, overriding the package's
+    ///     translations — lets an entry point set its own tone, e.g. a
+    ///     feedback action. Anything left unset falls back to those
+    ///     translations, or to the dashboard's copy for a project that opts
+    ///     into `usesDashboardStrings`.
+    public init(client: SupportChatClient,
+                startNewConversation: Bool = false,
+                strings: SupportChatStrings = .init()) {
         self.client = client
         self.startNewConversation = startNewConversation
-        self.greeting = greeting
+        self.strings = strings
     }
 
     public var body: some View {
@@ -81,7 +85,7 @@ public struct SupportChatView: View {
                    }
                },
                content: {
-                   IdentificationFormView(client: client)
+                   IdentificationFormView(client: client, strings: strings)
                        .presentationDetents([.medium])
                })
     }
@@ -118,9 +122,9 @@ public struct SupportChatView: View {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if rootShowsConversation {
-                ConversationView(client: client, greetingOverride: greeting)
+                ConversationView(client: client, strings: strings)
             } else {
-                TicketListView(client: client, path: $path, greetingOverride: greeting)
+                TicketListView(client: client, path: $path, strings: strings)
             }
         }
     }
@@ -129,12 +133,12 @@ public struct SupportChatView: View {
     private func destination(for route: SupportRoute) -> some View {
         switch route {
         case let .ticket(id, number):
-            ConversationView(client: client)
+            ConversationView(client: client, strings: strings)
                 .task { try? await client.openTicket(id) }
                 .navigationTitle(ticketTitle(number: number))
                 .navigationBarTitleDisplayMode(.inline)
         case .newConversation:
-            ConversationView(client: client, greetingOverride: greeting)
+            ConversationView(client: client, strings: strings)
                 .onAppear { client.prepareNewConversation() }
                 .navigationTitle(Text("New conversation", bundle: .module,
                                       comment: "Navigation title of the screen that starts a new support conversation."))
