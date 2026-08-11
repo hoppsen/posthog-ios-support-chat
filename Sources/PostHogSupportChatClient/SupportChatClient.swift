@@ -23,7 +23,11 @@ public final class SupportChatClient {
     /// PostHog's internal `$conversation_ticket_created` event is personless.
     public enum Event {
         case messageSent(ticketId: String, isNewTicket: Bool)
-        case identificationSubmitted(email: String)
+        /// Carries whatever the user supplied — a project may collect a name
+        /// without asking for an email. Hosts typically write these to the
+        /// person profile as `email` and `name`, the unprefixed properties
+        /// PostHog uses to display a person.
+        case identificationSubmitted(email: String?, name: String?)
     }
 
     public private(set) var state: State = .idle
@@ -135,11 +139,7 @@ public final class SupportChatClient {
     /// collects a name without asking for an email.
     public func setIdentification(email: String?, name: String?) {
         store.setTraits(email: email, name: name)
-        // The event exists so hosts can put the address on a person profile,
-        // so it only fires when there is an address.
-        if let email, !email.isEmpty {
-            onEvent?(.identificationSubmitted(email: email))
-        }
+        onEvent?(.identificationSubmitted(email: email, name: name))
     }
 
     /// Forgets the stored email/name and re-arms the identification ask —

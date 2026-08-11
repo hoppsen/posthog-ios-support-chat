@@ -128,10 +128,15 @@ supportChat.onEvent = { event in
     case let .messageSent(ticketId, isNewTicket):
         PostHogSDK.shared.capture("support:chat_message_sent",
                                   properties: ["ticket_id": ticketId, "is_new_ticket": isNewTicket])
-    case let .identificationSubmitted(email):
-        // Puts the support email on the person profile for segmentation.
+    case let .identificationSubmitted(email, name):
+        // `email` and `name` (unprefixed) are the properties PostHog uses to
+        // display a person, so writing them turns UUIDs into readable names
+        // across persons, activity, and the support inbox.
+        var person: [String: Any] = [:]
+        if let email { person["email"] = email }
+        if let name { person["name"] = name }
         PostHogSDK.shared.capture("support:chat_identification_submit",
-                                  userProperties: ["support_email": email])
+                                  userProperties: person)
     }
 }
 ```
