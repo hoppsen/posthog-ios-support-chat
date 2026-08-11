@@ -103,7 +103,16 @@ SupportChatConfiguration(projectApiKey: "phc_...", usesDashboardStrings: true)
 
 Worth it for a single-language app that wants to reword the greeting without shipping a release, or to keep an iOS chat and a web widget identical. The trade is the one above: whatever is typed in the dashboard is what every user sees, in that one language. Anything you pass in `strings:` still wins, and the bundled translations still fill fields the dashboard leaves empty.
 
-The chat follows the host app's tint, so wrap it in `.tint(…)` if your app sets its accent programmatically rather than through the asset catalog.
+### Tint
+
+The chat draws itself in the environment tint, so it picks up your app's accent with no configuration — and you can override it per presentation:
+
+```swift
+SupportChatView(client: supportChat)
+    .tint(.brandGreen)
+```
+
+One caveat if you present the chat in its own `UIWindow` (see below): a new window starts a fresh SwiftUI environment, so a `.tint(…)` applied to your app's root view does **not** reach it. It falls back to the `AccentColor` asset, which is the system blue if you set your accent programmatically instead. Apply `.tint(…)` to the `SupportChatView` you put in the window.
 
 ### Mirroring chat activity into your analytics
 
@@ -140,9 +149,14 @@ func presentFeedbackChat(in scene: UIWindowScene) {
     window.rootViewController = UIViewController()
     window.makeKeyAndVisible()
 
-    let chat = SupportChatView(client: supportChat,
-                               startNewConversation: true,   // straight into a fresh conversation
-                               greeting: "We read every message. What can we do better?")
+    let chat = SupportChatView(
+        client: supportChat,
+        startNewConversation: true,   // straight into a fresh conversation
+        strings: .init(greeting: LocalizedStringResource("We read every message. What can we do better?",
+                                                         comment: "Support chat greeting for the feedback action"))
+    )
+    // A new window does not inherit the app's environment tint.
+    .tint(.brandGreen)
     let host = DismissReportingHostingController(rootView: chat)
     host.onDismiss = { dismissOverlay() }
     overlayWindow = window
