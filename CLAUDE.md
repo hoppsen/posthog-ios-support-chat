@@ -112,6 +112,25 @@ greeting, placeholder, and identification texts participate only when a
 project sets `usesDashboardStrings` — they are single-value, so they are off
 by default and would otherwise defeat these translations entirely.
 
+## Identity model
+
+Ticket access is keyed solely to the Keychain-stored `widget_session_id`.
+Email and name are labels: collected optionally, never verified, and never
+used to link people. Two users who type the same address stay separate
+persons with separate tickets, and neither can read the other's — a fake or
+borrowed address costs the sender their reply, not someone else's privacy.
+
+The one real exposure is the reverse: PostHog emails replies to whatever
+address was given, so an address typed by mistake sends that conversation's
+content to its owner. There is no mitigation short of verification, which
+the widget protocol does not offer; it is worth knowing before wiring the
+address into anything beyond support.
+
+A host writing `email`/`name` to the person profile (see the README's
+`onEvent` recipe) is setting properties on the existing anonymous person —
+that does not identify or merge anyone either. Using an address as a
+`distinct_id` via `identify()` would, so don't.
+
 ## Testing
 
 `Tests/` pins the protocol with fixtures captured from live API responses

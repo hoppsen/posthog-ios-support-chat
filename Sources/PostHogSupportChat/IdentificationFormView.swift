@@ -81,9 +81,8 @@ struct IdentificationFormView: View {
             }
 
             Button {
-                let trimmedEmail = email.trimmingCharacters(in: .whitespaces)
-                client.setIdentification(email: trimmedEmail.isEmpty ? nil : trimmedEmail,
-                                         name: name.isEmpty ? nil : name)
+                // The client trims and drops blanks, so pass what was typed.
+                client.setIdentification(email: email, name: name)
                 dismiss()
             } label: {
                 Text("Continue", bundle: .module, comment: "Submit button of the support contact form.")

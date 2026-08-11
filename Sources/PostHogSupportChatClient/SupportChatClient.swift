@@ -137,7 +137,12 @@ public final class SupportChatClient {
 
     /// Stores whatever the user provided. `email` is nil for a project that
     /// collects a name without asking for an email.
+    /// Blank and whitespace-only values are treated as absent, so a stored
+    /// trait is never an empty string and `needsIdentification` cannot be
+    /// satisfied by one.
     public func setIdentification(email: String?, name: String?) {
+        let email = email?.trimmedOrNil
+        let name = name?.trimmedOrNil
         store.setTraits(email: email, name: name)
         onEvent?(.identificationSubmitted(email: email, name: name))
     }
@@ -340,5 +345,13 @@ public final class SupportChatClient {
         pollTask?.cancel()
         pollTask = nil
         consecutivePollFailures = 0
+    }
+}
+
+private extension String {
+    /// Nil for a value that is empty once trimmed.
+    var trimmedOrNil: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }
