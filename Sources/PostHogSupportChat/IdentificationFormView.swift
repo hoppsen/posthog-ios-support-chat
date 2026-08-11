@@ -13,21 +13,21 @@ struct IdentificationFormView: View {
     @Environment(\.dismiss) private var dismiss
 
     private var title: Text {
-        let fallback = LocalizedStringResource("Before we start...",
-                                               bundle: .package,
-                                               comment: "Header of the form asking for the user's email before the first support message.")
+        let bundled = LocalizedStringResource("Before we start...",
+                                              bundle: .package,
+                                              comment: "Header of the form asking for the user's email before the first support message.")
         return SupportChatStrings.text(strings.identificationTitle,
-                                       dashboard: client.dashboardIdentificationTitle,
-                                       fallback: fallback)
+                                       bundled: bundled,
+                                       dashboard: client.dashboardIdentificationTitle)
     }
 
     private var explanation: Text {
-        let fallback = LocalizedStringResource("Add your email so we can get back to you.",
-                                               bundle: .package,
-                                               comment: "Description of the optional email form, explaining the email is used to reply to the user.")
+        let bundled = LocalizedStringResource("Add your email so we can get back to you.",
+                                              bundle: .package,
+                                              comment: "Description of the optional email form, explaining the email is used to reply to the user.")
         return SupportChatStrings.text(strings.identificationDescription,
-                                       dashboard: client.dashboardIdentificationDescription,
-                                       fallback: fallback)
+                                       bundled: bundled,
+                                       dashboard: client.dashboardIdentificationDescription)
     }
 
     private var isEmailValid: Bool {

@@ -33,28 +33,29 @@ public struct SupportChatStrings: Sendable {
 }
 
 extension SupportChatStrings {
-    /// Resolves app override → dashboard value → bundled translation. The
-    /// dashboard tier is `nil` unless the configuration opts into it, so the
-    /// usual chain is just override → translation.
+    /// Precedence, highest first: `override`, then `dashboard`, then
+    /// `bundled`. The dashboard tier is `nil` unless the configuration opts
+    /// into it, so the usual chain is just `override` → `bundled` — which is
+    /// why the opt-in tier sits last in the parameter list.
     ///
     /// Dashboard values are server data and never treated as localization keys.
     static func text(_ override: LocalizedStringResource?,
-                     dashboard: String?,
-                     fallback: LocalizedStringResource) -> Text {
+                     bundled: LocalizedStringResource,
+                     dashboard: String?) -> Text {
         if let override { return Text(override) }
         if let dashboard, !dashboard.isEmpty { return Text(verbatim: dashboard) }
-        return Text(fallback)
+        return Text(bundled)
     }
 
     /// Same precedence, for APIs that need a plain `String` (e.g. a
     /// `TextField` placeholder). Still resolved at render time, so it also
     /// follows a locale change.
     static func string(_ override: LocalizedStringResource?,
-                       dashboard: String?,
-                       fallback: LocalizedStringResource) -> String {
+                       bundled: LocalizedStringResource,
+                       dashboard: String?) -> String {
         if let override { return String(localized: override) }
         if let dashboard, !dashboard.isEmpty { return dashboard }
-        return String(localized: fallback)
+        return String(localized: bundled)
     }
 }
 

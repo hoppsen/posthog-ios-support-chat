@@ -9,18 +9,18 @@ struct ConversationView: View {
     @FocusState private var composerFocused: Bool
 
     private var placeholder: String {
-        let fallback = LocalizedStringResource("Type your message...",
-                                               bundle: .package,
-                                               comment: "Placeholder of the chat message input field.")
+        let bundled = LocalizedStringResource("Type your message...",
+                                              bundle: .package,
+                                              comment: "Placeholder of the chat message input field.")
         return SupportChatStrings.string(strings.placeholder,
-                                         dashboard: client.dashboardPlaceholder,
-                                         fallback: fallback)
+                                         bundled: bundled,
+                                         dashboard: client.dashboardPlaceholder)
     }
 
     private var greeting: Text {
         SupportChatStrings.text(strings.greeting,
-                                dashboard: client.dashboardGreeting,
-                                fallback: .packageGreeting)
+                                bundled: .packageGreeting,
+                                dashboard: client.dashboardGreeting)
     }
 
     var body: some View {

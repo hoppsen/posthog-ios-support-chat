@@ -39,8 +39,8 @@ struct TicketListView: View {
                 .accessibilityHidden(true)
 
             SupportChatStrings.text(strings.greeting,
-                                    dashboard: client.dashboardGreeting,
-                                    fallback: .packageGreeting)
+                                    bundled: .packageGreeting,
+                                    dashboard: client.dashboardGreeting)
                 .font(.title3.bold())
                 .multilineTextAlignment(.center)
 
