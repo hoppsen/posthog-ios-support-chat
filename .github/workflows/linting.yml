@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@v7
       - name: Read version from Mintfile
         run: echo "SWIFTLINT_VERSION=$(awk '/SwiftLint/ {split($0, a, "@"); print a[2]}' Mintfile)" >> $GITHUB_ENV
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .build/release/swiftlint
           key: ${{ runner.os }}-linting-swiftlint-${{ env.SWIFTLINT_VERSION }}
@@ -52,7 +52,7 @@ jobs:
       - uses: actions/checkout@v7
       - name: Read version from Mintfile
         run: echo "SWIFTFORMAT_VERSION=$(awk '/SwiftFormat/ {split($0, a, "@"); print a[2]}' Mintfile)" >> $GITHUB_ENV
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .build/release/swiftformat
           key: ${{ runner.os }}-linting-swiftformat-${{ env.SWIFTFORMAT_VERSION }}
