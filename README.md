@@ -159,8 +159,8 @@ func presentFeedbackChat(in scene: UIWindowScene) {
         strings: .init(greeting: LocalizedStringResource("We read every message. What can we do better?",
                                                          comment: "Support chat greeting for the feedback action"))
     )
-    // A new window does not inherit the app's environment tint.
-    .tint(.brandGreen)
+    .tint(.brandGreen)   // a new window does not inherit the app's environment tint
+
     let host = DismissReportingHostingController(rootView: chat)
     host.onDismiss = { dismissOverlay() }
     overlayWindow = window
@@ -199,7 +199,7 @@ private final class DismissReportingHostingController<Content: View>: UIHostingC
 - **Auth:** the public conversations token is fetched from PostHog's remote config (`/array/<projectApiKey>/config` → `conversations.token`) and sent as `X-Conversations-Token`. No secret keys on device.
 - **Allowed domains:** if your project's Support settings restrict allowed domains, pass one of them as `origin` in the configuration — write endpoints reject native requests without an allowlisted `Origin` header. With an empty domain list, leave it nil.
 - **Access control:** a client-generated `widget_session_id` (stored in the **Keychain**, so ticket history survives app reinstalls) scopes all ticket access; wrong ids get 403.
-- **Identity:** designed for anonymous users. With `requireEmail` enabled in the dashboard, an email is *asked for* once per session before the first message — declining is allowed and remembered for the session. When provided it is sent as a trait: it labels tickets, enables PostHog's email reply notifications, and serves as the recovery key.
+- **Identity:** designed for anonymous users. With `requireEmail` enabled in the dashboard, an email is *asked for* once per session before the first message — declining is allowed and remembered for the session. When provided it is sent as a trait: it labels tickets in your inbox and enables PostHog's email reply notifications.
 - **New messages:** sent messages are echoed locally from the send response; incoming replies arrive via polling while the conversation is on screen (2s default, configurable via `pollInterval`), plus refresh on demand. No push — use PostHog's email notifications for async replies until [Workflows push notifications](https://github.com/PostHog/posthog/issues/45009) ship for iOS.
 - **Device moves:** not covered — the Keychain-stored session survives reinstalls on the same device, which is the common case for anonymous users. PostHog's email-based ticket recovery is currently web-oriented; see `CLAUDE.md` for the verified protocol details if you want to build on it.
 
@@ -214,11 +214,11 @@ All under the ingestion host (`https://us.i.posthog.com` / `eu.i.posthog.com`), 
 | `POST /api/conversations/v1/widget/messages/{id}/read` | Mark read |
 | `GET /api/conversations/v1/widget/tickets` | Ticket list with unread counts |
 
-Messages support rich text as TipTap JSON (`rich_content`), rendered to `AttributedString` by `TipTapRenderer` with a plain-text fallback.
+Messages carry rich text as TipTap JSON (`rich_content`), rendered to `AttributedString` by `TipTapRenderer`. Replies sent from the PostHog inbox arrive as markdown in `content` instead, which the same renderer parses, falling back to plain text.
 
 ## Development
 
-Tooling mirrors our app repos: [Mint](https://github.com/yonaskolb/Mint)-pinned SwiftFormat + SwiftLint, fastlane lanes, a pre-commit hook, and GitHub Actions for linting and tests.
+Tooling mirrors our app repos: [Mint](https://github.com/yonaskolb/Mint)-pinned SwiftFormat + SwiftLint, fastlane lanes, a pre-commit hook, and GitHub Actions for linting, tests, and a Release build for a generic iOS device.
 
 ```bash
 bundle install
