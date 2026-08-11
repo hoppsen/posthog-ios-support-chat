@@ -71,10 +71,14 @@ try? await supportChat.refreshTickets()   // supportChat.unreadCount
 Every user-facing string resolves in this order:
 
 ```
-strings: parameter (your app)  →  PostHog dashboard  →  the package's translations
+strings: parameter (your app)  →  the package's translations (54 languages)
 ```
 
-By default the dashboard is skipped, so the chain is just `strings:` → the package's translations, which ship in 54 languages.
+Copy configured in the PostHog dashboard is skipped unless you opt in, in which case it slots in between:
+
+```
+strings: parameter  →  PostHog dashboard  →  the package's translations
+```
 
 That default is deliberate. Enabling Support pre-fills the dashboard fields with English defaults (`Hey, how can I help you today?`, `Type your message...`, …), and **PostHog stores no translations for them** — unlike surveys. Using them would show English to every user regardless of locale, in place of the translations this package exists to provide. Left alone, those fields stay free to configure a web widget independently.
 
@@ -232,7 +236,7 @@ bundle exec fastlane check_translations   # fail on missing translations
 bundle exec fastlane translate_batch      # translate missing strings via ChatGPT
 ```
 
-Strings configurable in the PostHog dashboard (greeting, placeholder, identification form texts) always take precedence over the bundled fallbacks.
+These translations are what the chat shows by default. Copy passed by the host app in `strings:` wins over them, and dashboard copy only participates when a project opts into `usesDashboardStrings` — see [Copy and localization](#copy-and-localization).
 
 ## Status
 

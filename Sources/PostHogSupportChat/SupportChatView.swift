@@ -42,10 +42,11 @@ public struct SupportChatView: View {
     ///     (the list stays behind the back button) instead of auto-opening
     ///     the most recent active ticket. Use for entry points whose intent
     ///     is "start a new conversation", e.g. a feedback action.
-    ///   - strings: app-supplied copy that wins over the dashboard-configured
-    ///     strings and the bundled translations — lets an entry point set its
-    ///     own tone (e.g. a feedback action) and lets a localized app avoid
-    ///     the dashboard's single-language strings entirely.
+    ///   - strings: copy for this presentation, overriding the package's
+    ///     translations — lets an entry point set its own tone, e.g. a
+    ///     feedback action. Anything left unset falls back to those
+    ///     translations, or to the dashboard's copy for a project that opts
+    ///     into `usesDashboardStrings`.
     public init(client: SupportChatClient,
                 startNewConversation: Bool = false,
                 strings: SupportChatStrings = .init()) {
