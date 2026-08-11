@@ -72,10 +72,18 @@ public struct SupportChatView: View {
                 }
         }
         .task { await startAndAutoOpen() }
-        .sheet(isPresented: $showIdentificationForm) {
-            IdentificationFormView(client: client)
-                .interactiveDismissDisabled(client.needsIdentification)
-        }
+        .sheet(isPresented: $showIdentificationForm,
+               onDismiss: {
+                   // Swipe-dismissal counts as declining — the ask is optional
+                   // and should not re-present this session.
+                   if client.needsIdentification {
+                       client.identificationDeclined = true
+                   }
+               },
+               content: {
+                   IdentificationFormView(client: client)
+                       .presentationDetents([.medium])
+               })
     }
 
     @ViewBuilder
@@ -147,9 +155,20 @@ public struct SupportChatView: View {
         defer { didFinishInitialLoad = true }
         await client.start()
         guard client.state == .ready else { return }
+
+        // When the client already holds tickets from a previous presentation,
+        // auto-open from the cache immediately — waiting for the network
+        // refresh would leave the ticket list visible for a whole round-trip.
+        if client.hasLoadedTickets {
+            autoOpenIfNeeded()
+        }
+
         try? await client.refreshTickets()
         showIdentificationForm = client.needsIdentification
+        autoOpenIfNeeded()
+    }
 
+    private func autoOpenIfNeeded() {
         guard !didAutoOpen else { return }
         didAutoOpen = true
         rootShowsConversation = client.tickets.isEmpty

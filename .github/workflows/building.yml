@@ -1,0 +1,26 @@
+name: Building
+
+on:
+  pull_request:
+
+  push:
+    branches:
+      - main
+
+jobs:
+  # The testing workflow already builds Debug for the simulator; this catches
+  # what that cannot: release-mode optimization errors and device-only
+  # (arm64) compile issues, without a test host.
+  Build:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build (Release, generic iOS device)
+        run: |
+          xcodebuild build \
+            -scheme PostHogSupportChat-Package \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcbeautify --renderer github-actions || exit ${PIPESTATUS[0]}

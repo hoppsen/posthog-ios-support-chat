@@ -48,17 +48,22 @@ public final class SupportChatClient {
     /// `["source": "quick_action"]`) since the widget protocol has no tags.
     public var additionalTraits: [String: String] = [:]
 
-    /// The ticket a returning user most likely wants to continue: the most
-    /// recently updated one that is not resolved. Tickets arrive from the API
-    /// ordered by recency, so the first match wins.
+    /// The ticket a returning user most likely wants to continue: the
+    /// unresolved one with the most recent activity. `tickets` is kept
+    /// sorted by last activity, so the first match wins.
     public var bestOpenTicket: Ticket? {
         tickets.first { $0.status != .resolved }
     }
 
-    /// True when the config requires an email and none has been provided yet.
-    /// The UI should present the identification form before the first message.
+    /// Set when the user dismissed the identification form without providing
+    /// an email — the form is an ask, not a gate, and should not nag again
+    /// for the rest of this session.
+    public var identificationDeclined = false
+
+    /// True when the config asks for an email and none has been provided or
+    /// declined yet. The UI presents the identification form once per session.
     public var needsIdentification: Bool {
-        remoteConfig?.requireEmail == true && store.email == nil
+        remoteConfig?.requireEmail == true && store.email == nil && !identificationDeclined
     }
 
     public var email: String? { store.email }
@@ -101,6 +106,14 @@ public final class SupportChatClient {
     public func setIdentification(email: String, name: String?) {
         store.setTraits(email: email, name: name)
         onEvent?(.identificationSubmitted(email: email))
+    }
+
+    /// Forgets the stored email/name and re-arms the identification ask —
+    /// the form shows again on the next presentation (ticket access and
+    /// history are untouched).
+    public func clearIdentification() {
+        store.clearTraits()
+        identificationDeclined = false
     }
 
     /// Clears the active ticket so the next send starts a fresh conversation.
@@ -185,10 +198,15 @@ public final class SupportChatClient {
 
     /// Loads the full message list for a ticket and makes it the active one.
     public func openTicket(_ ticketId: String) async throws {
+        // Keep the cached thread when reopening the same ticket — blanking it
+        // just to refetch flashes an empty conversation; refreshMessages
+        // appends anything new incrementally.
+        if currentTicketId != ticketId {
+            messages = []
+        }
         currentTicketId = ticketId
         store.setCurrentTicketId(ticketId)
         currentTicketUnreadCount = 0
-        messages = []
         try await refreshMessages()
         await markAsRead()
     }
@@ -220,9 +238,16 @@ public final class SupportChatClient {
     public func refreshTickets() async throws {
         guard let api else { return }
         let response = try await api.getTickets(widgetSessionId: store.getOrCreateWidgetSessionId())
-        tickets = response.results
+        // The server returns tickets by creation date; a conversation list
+        // should surface the latest activity first (verified empirically:
+        // an agent reply does not move a ticket up in the server's order).
+        tickets = response.results.sorted { Self.lastActivity($0) > Self.lastActivity($1) }
         unreadCount = response.results.reduce(0) { $0 + ($1.unreadCount ?? 0) }
         hasLoadedTickets = true
+    }
+
+    private static func lastActivity(_ ticket: Ticket) -> Date {
+        ISO8601.date(from: ticket.lastMessageAt ?? ticket.createdAt) ?? .distantPast
     }
 
     public func markAsRead() async {

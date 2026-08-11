@@ -41,6 +41,14 @@ public struct SessionStore: Sendable {
         write(state)
     }
 
+    /// Removes the stored email and name without touching the session id.
+    public func clearTraits() {
+        guard var state = read() else { return }
+        state.email = nil
+        state.name = nil
+        write(state)
+    }
+
     public func setCurrentTicketId(_ id: String?) {
         var state = read() ?? State(widgetSessionId: UUID().uuidString.lowercased())
         state.currentTicketId = id

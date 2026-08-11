@@ -58,7 +58,9 @@ struct ConversationView: View {
                 // containers make scrollTo unreliable for not-yet-laid-out
                 // content at the bottom of the thread.
                 VStack(spacing: 12) {
-                    if client.messages.isEmpty,
+                    // Greeting only belongs to a fresh conversation — an
+                    // existing thread that is still loading would flash it.
+                    if client.messages.isEmpty, client.currentTicketId == nil,
                        let greeting = greetingOverride ?? client.remoteConfig?.greetingText {
                         GreetingBubble(text: greeting)
                     }
@@ -150,7 +152,7 @@ struct MessageBubble: View {
                 Text(TipTapRenderer.render(message))
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .background(isCustomer ? Color.accentColor : Color(.secondarySystemBackground))
+                    .background(isCustomer ? Color.accentColor : Color(.systemGray5))
                     .foregroundStyle(isCustomer ? .white : .primary)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
             }
@@ -167,7 +169,7 @@ struct GreetingBubble: View {
             Text(text)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(Color(.secondarySystemBackground))
+                .background(Color(.systemGray5))
                 .clipShape(RoundedRectangle(cornerRadius: 16))
             Spacer(minLength: 48)
         }
