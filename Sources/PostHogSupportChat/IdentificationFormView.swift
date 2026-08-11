@@ -17,7 +17,7 @@ struct IdentificationFormView: View {
                                                bundle: .package,
                                                comment: "Header of the form asking for the user's email before the first support message.")
         return SupportChatStrings.text(strings.identificationTitle,
-                                       dashboard: client.remoteConfig?.identificationFormTitle,
+                                       dashboard: client.dashboardIdentificationTitle,
                                        fallback: fallback)
     }
 
@@ -26,7 +26,7 @@ struct IdentificationFormView: View {
                                                bundle: .package,
                                                comment: "Description of the optional email form, explaining the email is used to reply to the user.")
         return SupportChatStrings.text(strings.identificationDescription,
-                                       dashboard: client.remoteConfig?.identificationFormDescription,
+                                       dashboard: client.dashboardIdentificationDescription,
                                        fallback: fallback)
     }
 

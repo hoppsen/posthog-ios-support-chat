@@ -29,6 +29,14 @@ public struct SupportChatConfiguration: Sendable {
     public let host: Host
     /// Interval for polling new messages while a conversation is on screen.
     public let pollInterval: TimeInterval
+    /// Whether copy configured in the PostHog dashboard (greeting,
+    /// placeholder, identification form texts) is used at all.
+    ///
+    /// Those strings are single-value — PostHog stores no translations for
+    /// them — so a localized app should set this to `false` and supply its own
+    /// via `SupportChatStrings`, falling back to the package's translations.
+    /// The dashboard values then belong to the web widget alone.
+    public let usesDashboardStrings: Bool
     /// Origin to send with every request (e.g. `https://example.com`).
     /// Required when the PostHog project's Support settings restrict allowed
     /// domains: write endpoints reject requests whose `Origin` is missing or
@@ -39,11 +47,13 @@ public struct SupportChatConfiguration: Sendable {
     public init(projectApiKey: String,
                 host: Host = .us,
                 pollInterval: TimeInterval = 2,
-                origin: URL? = nil) {
+                origin: URL? = nil,
+                usesDashboardStrings: Bool = true) {
         self.projectApiKey = projectApiKey
         self.host = host
         self.pollInterval = max(1, pollInterval)
         self.origin = origin
+        self.usesDashboardStrings = usesDashboardStrings
     }
 }
 

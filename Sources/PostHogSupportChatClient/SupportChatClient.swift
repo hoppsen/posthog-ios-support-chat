@@ -60,6 +60,22 @@ public final class SupportChatClient {
     /// for the rest of this session.
     public var identificationDeclined = false
 
+    // MARK: - Dashboard-configured copy
+
+    //
+    // Read through these rather than `remoteConfig` directly, so opting out
+    // via `usesDashboardStrings` covers every string in one place.
+
+    public var dashboardGreeting: String? { dashboardString(\.greetingText) }
+    public var dashboardPlaceholder: String? { dashboardString(\.placeholderText) }
+    public var dashboardIdentificationTitle: String? { dashboardString(\.identificationFormTitle) }
+    public var dashboardIdentificationDescription: String? { dashboardString(\.identificationFormDescription) }
+
+    private func dashboardString(_ key: KeyPath<ConversationsRemoteConfig, String?>) -> String? {
+        guard configuration.usesDashboardStrings else { return nil }
+        return remoteConfig?[keyPath: key]
+    }
+
     /// True when the config asks for an email and none has been provided or
     /// declined yet. The UI presents the identification form once per session.
     public var needsIdentification: Bool {

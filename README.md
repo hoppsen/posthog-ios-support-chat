@@ -74,7 +74,15 @@ Every user-facing string resolves in this order:
 strings: parameter (your app)  →  PostHog dashboard  →  the package's translations
 ```
 
-The package ships its own strings in 54 languages, but **dashboard strings are single-value** — PostHog stores no translations for them — so a dashboard greeting appears in one language for every user, next to an otherwise localized UI. A localized app should pass its own copy instead:
+The package ships its own strings in 54 languages, but **dashboard strings are single-value** — PostHog stores no translations for them — so a dashboard greeting appears in one language for every user, next to an otherwise localized UI.
+
+A localized app should therefore opt out of dashboard copy entirely, which leaves those fields free to configure a web widget independently:
+
+```swift
+SupportChatConfiguration(projectApiKey: "phc_...", usesDashboardStrings: false)
+```
+
+With that set, every string falls back to the package's translations, and you override only what you want to word yourself:
 
 ```swift
 SupportChatView(
@@ -89,7 +97,9 @@ SupportChatView(
 )
 ```
 
-`LocalizedStringResource` resolves at display time, so these follow an in-app language switcher. Leaving `strings` empty is fine too — the dashboard values (or the bundled translations) are used, which is the zero-configuration path.
+`LocalizedStringResource` resolves at display time, so these follow an in-app language switcher; in an app they default to the main bundle, so Xcode extraction and existing translation tooling pick them up.
+
+Leaving both alone is the zero-configuration path: dashboard values win, and the bundled translations fill any gaps.
 
 The chat follows the host app's tint, so wrap it in `.tint(…)` if your app sets its accent programmatically rather than through the asset catalog.
 

@@ -13,13 +13,13 @@ struct ConversationView: View {
                                                bundle: .package,
                                                comment: "Placeholder of the chat message input field.")
         return SupportChatStrings.string(strings.placeholder,
-                                         dashboard: client.remoteConfig?.placeholderText,
+                                         dashboard: client.dashboardPlaceholder,
                                          fallback: fallback)
     }
 
     private var greeting: Text {
         SupportChatStrings.text(strings.greeting,
-                                dashboard: client.remoteConfig?.greetingText,
+                                dashboard: client.dashboardGreeting,
                                 fallback: .packageGreeting)
     }
 
