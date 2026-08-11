@@ -74,15 +74,11 @@ Every user-facing string resolves in this order:
 strings: parameter (your app)  →  PostHog dashboard  →  the package's translations
 ```
 
-The package ships its own strings in 54 languages, but **dashboard strings are single-value** — PostHog stores no translations for them — so a dashboard greeting appears in one language for every user, next to an otherwise localized UI.
+By default the dashboard is skipped, so the chain is just `strings:` → the package's translations, which ship in 54 languages.
 
-A localized app should therefore opt out of dashboard copy entirely, which leaves those fields free to configure a web widget independently:
+That default is deliberate. Enabling Support pre-fills the dashboard fields with English defaults (`Hey, how can I help you today?`, `Type your message...`, …), and **PostHog stores no translations for them** — unlike surveys. Using them would show English to every user regardless of locale, in place of the translations this package exists to provide. Left alone, those fields stay free to configure a web widget independently.
 
-```swift
-SupportChatConfiguration(projectApiKey: "phc_...", usesDashboardStrings: false)
-```
-
-With that set, every string falls back to the package's translations, and you override only what you want to word yourself:
+Override only what you want to word yourself:
 
 ```swift
 SupportChatView(
@@ -99,7 +95,13 @@ SupportChatView(
 
 `LocalizedStringResource` resolves at display time, so these follow an in-app language switcher; in an app they default to the main bundle, so Xcode extraction and existing translation tooling pick them up.
 
-Leaving both alone is the zero-configuration path: dashboard values win, and the bundled translations fill any gaps.
+### Using the dashboard copy instead
+
+```swift
+SupportChatConfiguration(projectApiKey: "phc_...", usesDashboardStrings: true)
+```
+
+Worth it for a single-language app that wants to reword the greeting without shipping a release, or to keep an iOS chat and a web widget identical. The trade is the one above: whatever is typed in the dashboard is what every user sees, in that one language. Anything you pass in `strings:` still wins, and the bundled translations still fill fields the dashboard leaves empty.
 
 The chat follows the host app's tint, so wrap it in `.tint(…)` if your app sets its accent programmatically rather than through the asset catalog.
 
