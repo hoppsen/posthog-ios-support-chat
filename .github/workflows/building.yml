@@ -7,15 +7,22 @@ on:
     branches:
       - main
 
+# Pinned to the oldest Xcode the consuming apps build with, so a compiler
+# version that rejects code the local toolchain accepts fails here first.
+env:
+  XCODE_VERSION: '26.3'
+
 jobs:
   # The testing workflow already builds Debug for the simulator; this catches
   # what that cannot: release-mode optimization errors and device-only
   # (arm64) compile issues, without a test host.
   Build:
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - name: Select Xcode version
+        run: sudo xcode-select -s '/Applications/Xcode_${{ env.XCODE_VERSION }}.app'
       - name: Build (Release, generic iOS device)
         run: |
           xcodebuild build \
