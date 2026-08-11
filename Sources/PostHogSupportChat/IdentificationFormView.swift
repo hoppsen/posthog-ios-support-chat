@@ -1,10 +1,10 @@
 import PostHogSupportChatClient
 import SwiftUI
 
-/// Optional email ask shown once per session before the first message, when
-/// the project config has `requireEmail` enabled. The email lets the team
-/// reply by mail, labels tickets in the PostHog inbox, and acts as the
-/// recovery key for reinstalls — but the user can decline and chat anyway.
+/// Optional ask shown once per session before the first message, for the
+/// fields the project collects: an email, a name, or both. An email lets the
+/// team reply by mail and labels tickets in the PostHog inbox — but the user
+/// can decline and chat anyway.
 struct IdentificationFormView: View {
     let client: SupportChatClient
     var strings: SupportChatStrings = .init()
@@ -34,6 +34,13 @@ struct IdentificationFormView: View {
         email.contains("@") && email.contains(".") && email.count >= 5
     }
 
+    /// Only the asked-for field gates submission; a name-only project cannot
+    /// be satisfied by an email that is never shown.
+    private var canContinue: Bool {
+        if client.asksForEmail { return isEmailValid }
+        return !name.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
     var body: some View {
         VStack(spacing: 14) {
             Image(systemName: "envelope.open.fill")
@@ -50,18 +57,20 @@ struct IdentificationFormView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
-            TextField(String(localized: "Email", bundle: .module,
-                             comment: "Email text field label in the support contact form."),
-                      text: $email)
-                .keyboardType(.emailAddress)
-                .textContentType(.emailAddress)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .padding(12)
-                .background(Color(.tertiarySystemFill))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+            if client.asksForEmail {
+                TextField(String(localized: "Email", bundle: .module,
+                                 comment: "Email text field label in the support contact form."),
+                          text: $email)
+                    .keyboardType(.emailAddress)
+                    .textContentType(.emailAddress)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .padding(12)
+                    .background(Color(.tertiarySystemFill))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
 
-            if client.remoteConfig?.collectName == true {
+            if client.asksForName {
                 TextField(String(localized: "Name", bundle: .module,
                                  comment: "Name text field label in the support contact form."),
                           text: $name)
@@ -72,8 +81,8 @@ struct IdentificationFormView: View {
             }
 
             Button {
-                client.setIdentification(email: email.trimmingCharacters(in: .whitespaces),
-                                         name: name.isEmpty ? nil : name)
+                // The client trims and drops blanks, so pass what was typed.
+                client.setIdentification(email: email, name: name)
                 dismiss()
             } label: {
                 Text("Continue", bundle: .module, comment: "Submit button of the support contact form.")
@@ -84,10 +93,10 @@ struct IdentificationFormView: View {
                     // SwiftUI's disabled borderedProminent desaturates to a
                     // murky gray in dark mode; the widget convention is to
                     // keep the accent and dim it instead.
-                    .background(.tint.opacity(isEmailValid ? 1 : 0.45), in: Capsule())
+                    .background(.tint.opacity(canContinue ? 1 : 0.45), in: Capsule())
             }
             .buttonStyle(.plain)
-            .disabled(!isEmailValid)
+            .disabled(!canContinue)
             .padding(.top, 6)
 
             Button {

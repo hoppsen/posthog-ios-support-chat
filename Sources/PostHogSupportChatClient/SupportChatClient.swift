@@ -23,7 +23,11 @@ public final class SupportChatClient {
     /// PostHog's internal `$conversation_ticket_created` event is personless.
     public enum Event {
         case messageSent(ticketId: String, isNewTicket: Bool)
-        case identificationSubmitted(email: String)
+        /// Carries whatever the user supplied — a project may collect a name
+        /// without asking for an email. Hosts typically write these to the
+        /// person profile as `email` and `name`, the unprefixed properties
+        /// PostHog uses to display a person.
+        case identificationSubmitted(email: String?, name: String?)
     }
 
     public private(set) var state: State = .idle
@@ -76,10 +80,22 @@ public final class SupportChatClient {
         return remoteConfig?[keyPath: key]
     }
 
-    /// True when the config asks for an email and none has been provided or
+    /// Whether the project asks for each field on the identification form.
+    public var asksForEmail: Bool { remoteConfig?.requireEmail == true }
+    public var asksForName: Bool { remoteConfig?.collectName == true }
+
+    /// True when the project asks for something the user has not provided or
     /// declined yet. The UI presents the identification form once per session.
+    ///
+    /// A project can collect a name without asking for an email, so the email
+    /// is the gate only when it is actually asked for. Whichever field gates
+    /// counts as answered once provided — the other is genuinely optional and
+    /// must not re-open the form every session.
     public var needsIdentification: Bool {
-        remoteConfig?.requireEmail == true && store.email == nil && !identificationDeclined
+        guard !identificationDeclined else { return false }
+        if asksForEmail { return store.email == nil }
+        if asksForName { return store.name == nil }
+        return false
     }
 
     public var email: String? { store.email }
@@ -119,9 +135,16 @@ public final class SupportChatClient {
         }
     }
 
-    public func setIdentification(email: String, name: String?) {
+    /// Stores whatever the user provided. `email` is nil for a project that
+    /// collects a name without asking for an email.
+    /// Blank and whitespace-only values are treated as absent, so a stored
+    /// trait is never an empty string and `needsIdentification` cannot be
+    /// satisfied by one.
+    public func setIdentification(email: String?, name: String?) {
+        let email = email?.trimmedOrNil
+        let name = name?.trimmedOrNil
         store.setTraits(email: email, name: name)
-        onEvent?(.identificationSubmitted(email: email))
+        onEvent?(.identificationSubmitted(email: email, name: name))
     }
 
     /// Forgets the stored email/name and re-arms the identification ask —
@@ -322,5 +345,13 @@ public final class SupportChatClient {
         pollTask?.cancel()
         pollTask = nil
         consecutivePollFailures = 0
+    }
+}
+
+private extension String {
+    /// Nil for a value that is empty once trimmed.
+    var trimmedOrNil: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }

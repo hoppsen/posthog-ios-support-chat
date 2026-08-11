@@ -128,10 +128,17 @@ supportChat.onEvent = { event in
     case let .messageSent(ticketId, isNewTicket):
         PostHogSDK.shared.capture("support:chat_message_sent",
                                   properties: ["ticket_id": ticketId, "is_new_ticket": isNewTicket])
-    case let .identificationSubmitted(email):
-        // Puts the support email on the person profile for segmentation.
+    case let .identificationSubmitted(email, name):
+        // `email` and `name` (unprefixed) are the properties PostHog uses to
+        // display a person, so writing them turns UUIDs into readable names
+        // across persons, activity, and the support inbox. This sets
+        // properties on the existing person — it does not identify or merge
+        // anyone, and the address is unverified, so treat it as a label.
+        var person: [String: Any] = [:]
+        if let email { person["email"] = email }
+        if let name { person["name"] = name }
         PostHogSDK.shared.capture("support:chat_identification_submit",
-                                  userProperties: ["support_email": email])
+                                  userProperties: person)
     }
 }
 ```
@@ -199,7 +206,7 @@ private final class DismissReportingHostingController<Content: View>: UIHostingC
 - **Auth:** the public conversations token is fetched from PostHog's remote config (`/array/<projectApiKey>/config` → `conversations.token`) and sent as `X-Conversations-Token`. No secret keys on device.
 - **Allowed domains:** if your project's Support settings restrict allowed domains, pass one of them as `origin` in the configuration — write endpoints reject native requests without an allowlisted `Origin` header. With an empty domain list, leave it nil.
 - **Access control:** a client-generated `widget_session_id` (stored in the **Keychain**, so ticket history survives app reinstalls) scopes all ticket access; wrong ids get 403.
-- **Identity:** designed for anonymous users. With `requireEmail` enabled in the dashboard, an email is *asked for* once per session before the first message — declining is allowed and remembered for the session. When provided it is sent as a trait: it labels tickets in your inbox and enables PostHog's email reply notifications.
+- **Identity:** designed for anonymous users. The identification form asks for whatever the project collects — an email, a name, or both — once per session before the first message; declining is allowed and remembered for the session. What is provided is sent as a message trait: it labels tickets in your inbox and, for an email, enables PostHog's reply notifications. Nothing is verified and nothing is merged: ticket access stays keyed to the Keychain-stored session id, so two people who type the same address remain separate, and neither can reach the other's conversations.
 - **New messages:** sent messages are echoed locally from the send response; incoming replies arrive via polling while the conversation is on screen (2s default, configurable via `pollInterval`), plus refresh on demand. No push — use PostHog's email notifications for async replies until [Workflows push notifications](https://github.com/PostHog/posthog/issues/45009) ship for iOS.
 - **Device moves:** not covered — the Keychain-stored session survives reinstalls on the same device, which is the common case for anonymous users. PostHog's email-based ticket recovery is currently web-oriented; see `CLAUDE.md` for the verified protocol details if you want to build on it.
 
