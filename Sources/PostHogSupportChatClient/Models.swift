@@ -180,9 +180,12 @@ package enum ISO8601 {
         // ISO8601DateFormatter only accepts 3 fractional digits; trim longer fractions.
         if let dotRange = string.range(of: "."),
            let tzRange = string.range(of: "[Z+\\-]", options: .regularExpression, range: dotRange.upperBound ..< string.endIndex) {
+            // Concatenate as String, not Substring: mixing the two relies on
+            // overload resolution that older Swift compilers reject.
+            let head = String(string[..<dotRange.upperBound])
             let fraction = String(string[dotRange.upperBound ..< tzRange.lowerBound].prefix(3))
-            let trimmed = string[..<dotRange.upperBound] + fraction + string[tzRange.lowerBound...]
-            if let date = fractional.date(from: String(trimmed)) { return date }
+            let tail = String(string[tzRange.lowerBound...])
+            if let date = fractional.date(from: head + fraction + tail) { return date }
         }
         let plain = ISO8601DateFormatter()
         plain.formatOptions = [.withInternetDateTime]
