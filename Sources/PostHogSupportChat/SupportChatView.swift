@@ -57,10 +57,10 @@ public struct SupportChatView: View {
     ///     into `usesDashboardStrings`.
     ///   - requestNotifications: enables a "Get notified when we reply" row
     ///     in conversations that have a ticket, shown while the app's
-    ///     notification permission is undecided. Tapping it calls this
-    ///     closure, which should request authorization and call
-    ///     `registerForRemoteNotifications()`. The package never registers
-    ///     for push itself — the app owns push setup.
+    ///     notification permission is undecided or provisional. Tapping it
+    ///     calls this closure, which should request full authorization and
+    ///     call `registerForRemoteNotifications()`. The package never
+    ///     registers for push itself — the app owns push setup.
     public init(client: SupportChatClient,
                 ticketId: String? = nil,
                 startNewConversation: Bool = false,

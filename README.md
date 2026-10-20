@@ -235,7 +235,7 @@ Inbox replies are markdown, so a preview can show escapes such as `\.` (the work
 
 **2. Permission and registration**
 
-Pass `requestNotifications` and the chat shows a "Get notified when we reply" row once a conversation has a ticket, while the notification permission is still undecided. Tapping it runs your closure; the × hides it for the session:
+Pass `requestNotifications` and the chat shows a "Get notified when we reply" row once a conversation has a ticket, while the notification permission is undecided or provisional. Tapping it runs your closure; the × hides it until the next launch. After a "Don't Allow" iOS never shows its dialog again, so the row disappears for good — give people a way back, such as a Settings row that opens `UIApplication.openNotificationSettingsURLString`:
 
 ```swift
 SupportChatView(client: supportChat, requestNotifications: {
@@ -245,7 +245,27 @@ SupportChatView(client: supportChat, requestNotifications: {
 })
 ```
 
-posthog-ios picks up the device token from there. If your PostHog config sets `enableSwizzling = false`, call `PostHogSDK.shared.registerPushNotificationToken(token)` from `application(_:didRegisterForRemoteNotificationsWithDeviceToken:)` yourself.
+**Provisional permission** reaches people who never tap the row: an app may request it without any dialog, and notifications then arrive quietly in Notification Center. Requesting it when someone sends their first message means every reply lands somewhere, while the row stays up to offer banners and sound:
+
+```swift
+supportChat.onEvent = { event in
+    guard case .messageSent(_, isNewTicket: true) = event else { return }
+    Task {
+        let center = UNUserNotificationCenter.current()
+        guard await center.notificationSettings().authorizationStatus == .notDetermined,
+              (try? await center.requestAuthorization(options: [.alert, .sound, .badge, .provisional])) == true else { return }
+        UIApplication.shared.registerForRemoteNotifications()
+    }
+}
+```
+
+**Deliver the token yourself.** posthog-ios is meant to pick up the device token automatically, but in a SwiftUI app (`@UIApplicationDelegateAdaptor`) it never arrives: the SDK adds its callback to SwiftUI's wrapper delegate after UIKit has already recorded which delegate methods exist, so UIKit never calls it. Implement the callback in your app delegate and pass the token on — the SDK skips a token it already sent:
+
+```swift
+func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+    PostHogSDK.shared.registerPushNotificationToken(deviceToken.map { String(format: "%02x", $0) }.joined())
+}
+```
 
 **3. Handling notifications**
 

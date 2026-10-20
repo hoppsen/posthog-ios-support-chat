@@ -89,8 +89,20 @@ package only routes taps and offers the permission row. Findings:
 - The push step sends by raw distinct id to device tokens that posthog-ios
   registers (3.69.0+ only). A device on an older SDK logs
   `No active APNS device token found for distinct_id` — nothing is sent and
-  the run does not fail. Whether a token registered after `identify()` is
-  found under the pre-identify id stored on a ticket is untested.
+  the run does not fail. Tokens are stored as properties on the **person**,
+  keyed by bundle id, so a token registered after `identify()` is still
+  found through the pre-identify id stored on a ticket.
+- posthog-ios's automatic token pickup does not fire in SwiftUI apps
+  (`@UIApplicationDelegateAdaptor`): it swizzles the callback onto SwiftUI's
+  wrapper delegate asynchronously after setup, but UIKit caches which
+  delegate methods exist when the delegate is assigned. Apps must implement
+  `didRegisterForRemoteNotificationsWithDeviceToken` and call
+  `registerPushNotificationToken` (observed on device with posthog-ios
+  3.69.3: permission granted, no token ever reached PostHog).
+- Tokens carry no APNs environment. With both a production and a sandbox
+  channel selected, every token is sent to both; the wrong environment
+  answers BadDeviceToken, which PostHog logs as an `invalid_token` error
+  (not pruned). Live workflows should select the production channel only.
 - PostHog spreads the push step's custom `data` into the top level of the
   APNs payload beside `aps` (and FCM data lands at the top level of
   `userInfo` too). The `posthog` key is reserved for open-tracking

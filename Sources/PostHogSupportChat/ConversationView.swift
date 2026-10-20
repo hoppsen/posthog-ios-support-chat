@@ -8,8 +8,9 @@ struct ConversationView: View {
     var strings: SupportChatStrings = .init()
     var requestNotifications: (@MainActor () async -> Void)?
     @State private var draft = ""
-    /// Nil until read; the prompt only shows for `.notDetermined`, the one
-    /// state in which iOS will still present its permission dialog.
+    /// Nil until read. The prompt shows only in the states where iOS will
+    /// still present its permission dialog: undecided, and provisional (quiet
+    /// delivery an app may request without asking, which the dialog upgrades).
     @State private var notificationStatus: UNAuthorizationStatus?
     @FocusState private var composerFocused: Bool
 
@@ -52,7 +53,7 @@ struct ConversationView: View {
     /// first message there is nothing to reply to.
     private var showsNotificationPrompt: Bool {
         requestNotifications != nil
-            && notificationStatus == .notDetermined
+            && (notificationStatus == .notDetermined || notificationStatus == .provisional)
             && client.currentTicketId != nil
             && !client.notificationPromptDeclined
     }
