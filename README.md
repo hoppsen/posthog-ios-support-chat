@@ -451,6 +451,7 @@ var body: some View {
 Behavior worth knowing:
 
 - **The "Get notified when we reply" row** appears once a conversation has a ticket, while permission is undecided or provisional. × hides it until the next launch. After a "Don't Allow", iOS never shows its dialog again, so the row disappears for good. That's what the Settings row is for.
+- **Refresh the Settings row when the chat closes** if the chat opens from the same screen, e.g. `.sheet(isPresented:onDismiss:)` calling the row's refresh. The chat changes the permission (quietly on the first message, or through "Turn on") while that screen stays underneath, so neither the row's first read nor the return-to-foreground refresh notices.
 - **A ticket that doesn't belong to this device's session** is ignored, and the chat opens as usual.
 - **Mirror the moments into your analytics** if you like: capture an event in `requestReplyNotifications()` (with whether it was granted and which row asked) and in `handleNotificationTap` (with the ticket id). posthog-ios also records `$push_notification_opened` automatically.
 
