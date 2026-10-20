@@ -87,8 +87,11 @@ package only routes taps and offers the permission row. Findings:
   switch person, hence two workflows: A (reply → "Get conversation ticket"
   → capture `support:reply_received` with the ticket's `distinct_id`) and
   B (that event → push). `postHogCapture` events do trigger workflows; loop
-  protection only stops chains after 10 hops. If PostHog ever honors the
-  push step's Distinct ID, this collapses back into one workflow.
+  protection only stops chains after 10 hops. The hand-off costs one
+  ingestion round trip (~100 s observed). Reported upstream as
+  [PostHog/posthog#120326](https://github.com/PostHog/posthog/issues/120326);
+  once the push step honors its Distinct ID, this collapses back into one
+  workflow with no change to the package or apps.
 - "Get conversation ticket" (`template-posthog-get-ticket`) returns the
   customer's `distinct_id`: the id sent with the message that created the
   ticket (`SupportChatContextProvider.distinctId`).

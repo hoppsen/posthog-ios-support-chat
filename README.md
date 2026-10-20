@@ -221,7 +221,7 @@ The package stays dependency-free and never registers for push itself.
 
 **1. The workflows**
 
-A push step delivers to the person the workflow run belongs to — its "Distinct ID" field only appears in log messages. A reply event belongs to the team member who replied, so a single workflow on it would look for the team member's device. Two workflows hand the reply over to the customer instead:
+A push step delivers to the person the workflow run belongs to — its "Distinct ID" field only appears in log messages ([PostHog/posthog#120326](https://github.com/PostHog/posthog/issues/120326)). A reply event belongs to the team member who replied, so a single workflow on it would look for the team member's device. Two workflows hand the reply over to the customer instead:
 
 ```
 Team replies in the inbox
@@ -247,6 +247,8 @@ Team replies in the inbox
 | Push notification | Distinct ID `{event.distinct_id}`, your **production** APNs channel, a title such as "New reply from support", body `{{ event.properties.message_content \| strip_html \| truncate: 180 }}`, custom data `{"type": "support_reply", "ticket_id": "{event.properties.ticket_id}"}` |
 
 The ticket carries the customer's distinct id: whatever your `SupportChatContextProvider.distinctId` returned when the ticket was created, so it must return `PostHogSDK.shared.getDistinctId()`, the id the SDK registers the device under. The custom data keys must match `SupportChatNotification`.
+
+Expect a minute or two between the reply and the push: the captured event goes through PostHog's ingestion before it triggers workflow B. Once the push step honors its Distinct ID, the push moves into workflow A (`{variables.ticket.distinct_id}`) and the delay disappears; the app side stays the same.
 
 Select only the production channel in a live workflow. Tokens carry no APNs environment, so with a sandbox channel selected too, every push is also sent to the wrong environment and logs a `BadDeviceToken` error. Add the sandbox channel only while testing a build run from Xcode.
 
