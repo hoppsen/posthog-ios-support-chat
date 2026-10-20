@@ -1,11 +1,17 @@
 import PostHogSupportChatClient
 import SwiftUI
+import UserNotifications
 
 /// The message thread + composer for the active ticket.
 struct ConversationView: View {
     let client: SupportChatClient
     var strings: SupportChatStrings = .init()
+    var requestNotifications: (@MainActor () async -> Void)?
     @State private var draft = ""
+    /// Nil until read. The prompt shows only in the states where iOS will
+    /// still present its permission dialog: undecided, and provisional (quiet
+    /// delivery an app may request without asking, which the dialog upgrades).
+    @State private var notificationStatus: UNAuthorizationStatus?
     @FocusState private var composerFocused: Bool
 
     private var placeholder: String {
@@ -29,11 +35,65 @@ struct ConversationView: View {
             if client.currentTicketStatus == .resolved {
                 resolvedFooter
             } else {
+                if showsNotificationPrompt {
+                    notificationPrompt
+                }
                 composer
             }
         }
         .onAppear { client.startPolling() }
         .onDisappear { client.stopPolling() }
+        .task {
+            guard requestNotifications != nil else { return }
+            await refreshNotificationStatus()
+        }
+    }
+
+    /// Asks only once there is a ticket to be notified about — before the
+    /// first message there is nothing to reply to.
+    private var showsNotificationPrompt: Bool {
+        requestNotifications != nil
+            && (notificationStatus == .notDetermined || notificationStatus == .provisional)
+            && client.currentTicketId != nil
+            && !client.notificationPromptDeclined
+    }
+
+    private var notificationPrompt: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "bell.badge")
+                .foregroundStyle(.tint)
+            Text("Get notified when we reply", bundle: .module,
+                 comment: "Row above the chat input offering push notifications for support replies.")
+                .font(.subheadline)
+            Spacer(minLength: 0)
+            Button {
+                Task {
+                    await requestNotifications?()
+                    await refreshNotificationStatus()
+                }
+            } label: {
+                Text("Turn on", bundle: .module,
+                     comment: "Button that enables push notifications for support replies. Keep it short.")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            Button {
+                client.notificationPromptDeclined = true
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .accessibilityLabel(Text("Not now", bundle: .module,
+                                     comment: "Dismisses an optional ask: skips the optional email form, or declines the offer of reply notifications."))
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .background(.bar)
+    }
+
+    private func refreshNotificationStatus() async {
+        notificationStatus = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
     }
 
     /// Resolved conversations stay readable but closed for replies —

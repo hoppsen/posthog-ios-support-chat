@@ -72,6 +72,55 @@ Findings that go beyond the TypeScript types in posthog-js:
   every request for projects that restrict domains; leave it nil when the
   project's domain list is empty (empty = allow all).
 
+## Push notifications for replies (verified October 2026)
+
+Push runs entirely through PostHog Workflows (see the README recipe); the
+package only routes taps and offers the permission row. Findings:
+
+- `$conversation_message_sent` (a team reply) is a regular event, but it
+  belongs to the **replying PostHog user** (its `distinct_id` is theirs).
+- A push step reads device tokens from the person the workflow run belongs
+  to (`globals.person`); its required "Distinct ID" input is only used in
+  log messages. So a push in a workflow triggered by a reply searches the
+  team member's devices — while logging the customer's id in
+  `No active APNS device token found for distinct_id: …`. A run cannot
+  switch person, hence two workflows: A (reply → "Get conversation ticket"
+  → capture `support:reply_received` with the ticket's `distinct_id`) and
+  B (that event → push). `postHogCapture` events do trigger workflows; loop
+  protection only stops chains after 10 hops. The hand-off costs one
+  ingestion round trip (~100 s observed). Reported upstream as
+  [PostHog/posthog#120326](https://github.com/PostHog/posthog/issues/120326);
+  once the push step honors its Distinct ID, this collapses back into one
+  workflow with no change to the package or apps.
+- "Get conversation ticket" (`template-posthog-get-ticket`) returns the
+  customer's `distinct_id`: the id sent with the message that created the
+  ticket (`SupportChatContextProvider.distinctId`).
+- `message_content` is the reply's markdown, truncated to 1,000 characters.
+  The workflow's Liquid templating rejects a backslash in any string literal,
+  so markdown escapes (`\.`) cannot be stripped in the push body.
+- posthog-ios registers device tokens on its own (3.69.0+ only; verified
+  in a SwiftUI app, though the token can arrive a launch later). A device
+  without a token logs `No active APNS device token found for distinct_id`
+  — nothing is sent and the run does not fail. Tokens are stored as person
+  properties (`$device_push_subscription_<bundle id>:<hash>`, encrypted),
+  so after an `identify()` merge they should stay reachable through the
+  pre-identify id stored on a ticket (inferred from PostHog's code, untested).
+- Tokens carry no APNs environment. With both a production and a sandbox
+  channel selected, every token is sent to both; the wrong environment
+  answers BadDeviceToken, which PostHog logs as an `invalid_token` error
+  (not pruned). Live workflows should select the production channel only.
+- PostHog spreads the push step's custom `data` into the top level of the
+  APNs payload beside `aps` (and FCM data lands at the top level of
+  `userInfo` too). The `posthog` key is reserved for open-tracking
+  correlation. `SupportChatNotification` pins the `type` / `ticket_id` keys.
+- Push identity verification needs a server that can vouch for who owns a
+  distinct id; with anonymous, device-generated ids it proves nothing, so it
+  stays disabled for this package's audience.
+
+The posthog-ios 3.69.0 requirement belongs to the app's push setup. Do not add
+posthog-ios as a package dependency to enforce it: SPM would constrain every
+consumer, and the zero-dependency design is deliberate (see Architecture).
+
 ## Why there is no restore / deep-link support (for now)
 
 The web widget offers email-based ticket recovery (`POST .../restore/request`

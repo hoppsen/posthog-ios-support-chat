@@ -64,6 +64,20 @@ public final class SupportChatClient {
     /// for the rest of this session.
     public var identificationDeclined = false
 
+    /// Set when the user dismissed the "get notified when we reply" row —
+    /// like the identification ask, it should not reappear this session.
+    public var notificationPromptDeclined = false
+
+    /// The ticket whose conversation is on screen right now, or nil.
+    ///
+    /// A conversation polls exactly while it is visible, so this is the
+    /// current ticket while polling runs. Apps use it to drop the banner for
+    /// a reply push about the conversation the user is already reading —
+    /// polling delivers that reply on its own.
+    public var visibleTicketId: String? {
+        pollTask == nil ? nil : currentTicketId
+    }
+
     // MARK: - Dashboard-configured copy
 
     //

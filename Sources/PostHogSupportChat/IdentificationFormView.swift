@@ -117,7 +117,7 @@ struct IdentificationFormView: View {
                 dismiss()
             } label: {
                 Text("Not now", bundle: .module,
-                     comment: "Button that skips the optional email form and continues to the chat.")
+                     comment: "Dismisses an optional ask: skips the optional email form, or declines the offer of reply notifications.")
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
