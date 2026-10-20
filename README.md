@@ -221,6 +221,8 @@ The package stays dependency-free and never registers for push itself.
 
 **1. The workflows**
 
+The step-by-step setup, including the exact workflow definitions to create over PostHog MCP, test-run and verification steps, and troubleshooting, is in [PostHogWorkflows.md](PostHogWorkflows.md).
+
 A push step delivers to the person the workflow run belongs to — its "Distinct ID" field only appears in log messages ([PostHog/posthog#120326](https://github.com/PostHog/posthog/issues/120326)). A reply event belongs to the team member who replied, so a single workflow on it would look for the team member's device. Two workflows hand the reply over to the customer instead:
 
 ```
