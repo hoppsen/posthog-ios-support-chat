@@ -201,13 +201,113 @@ private final class DismissReportingHostingController<Content: View>: UIHostingC
 }
 ```
 
+### Push notifications for replies
+
+People rarely sit in the chat waiting for an answer, so replies they never see are the main failure mode of in-app support. PostHog Workflows can push a notification to the customer's device when someone replies from the inbox. The work splits three ways:
+
+| Who | Does what |
+|---|---|
+| PostHog | A workflow sends the push when your team replies |
+| Your app | Push setup: capability, permission, registering with iOS, the notification delegate, presenting the chat |
+| This package | Opens the right ticket from a tap, tells you which ticket is on screen, and can offer a "Get notified when we reply" row |
+
+The package stays dependency-free and never registers for push itself.
+
+**Requirements**
+
+- **posthog-ios 3.69.0 or newer in your app.** That is the first version that registers device tokens with PostHog (automatically, once your app calls `registerForRemoteNotifications()`). Older SDK versions leave the device unreachable, and the workflow logs `No active APNS device token found for distinct_id`.
+- The **Push Notifications** capability on your app target.
+- An **APNs channel** in PostHog under Workflows → Channels, matching your bundle id. Use Production for TestFlight and App Store builds, Sandbox for builds run from Xcode — a mismatch drops pushes silently. For anonymous users, leave **Identity verification** disabled: it needs a server that knows who owns a distinct id, which an app without accounts does not have.
+
+**1. The workflow**
+
+Create a workflow with these steps:
+
+| Step | Configuration |
+|---|---|
+| Trigger | Event `$conversation_message_sent`, filtered to `channel_source = widget` and `author_type = team` |
+| Get conversation ticket | Ticket ID `{event.properties.ticket_id}` (the default), output variable `ticket` |
+| Push notification | Distinct ID `{variables.ticket.distinct_id}`, your APNs channel, a title such as "New reply from support", body `{{ event.properties.message_content \| strip_html \| truncate: 180 }}`, custom data `{"type": "support_reply", "ticket_id": "{event.properties.ticket_id}"}` |
+
+The Get ticket step is required: the reply event's distinct id belongs to the team member who replied, not the customer. The ticket carries the customer's distinct id, which is whatever your `SupportChatContextProvider.distinctId` returned when the ticket was created — so it must return `PostHogSDK.shared.getDistinctId()`, the id the SDK registers the device under. The custom data keys must match `SupportChatNotification`.
+
+Inbox replies are markdown, so a preview can show escapes such as `\.` (the workflow's Liquid templating rejects backslashes, so they cannot be stripped there). A preview also puts up to 180 characters of the reply on the lock screen. Use a generic body such as "You have a new reply" if replies may be sensitive.
+
+**2. Permission and registration**
+
+Pass `requestNotifications` and the chat shows a "Get notified when we reply" row once a conversation has a ticket, while the notification permission is still undecided. Tapping it runs your closure; the × hides it for the session:
+
+```swift
+SupportChatView(client: supportChat, requestNotifications: {
+    let center = UNUserNotificationCenter.current()
+    guard (try? await center.requestAuthorization(options: [.alert, .sound, .badge])) == true else { return }
+    UIApplication.shared.registerForRemoteNotifications()
+})
+```
+
+posthog-ios picks up the device token from there. If your PostHog config sets `enableSwizzling = false`, call `PostHogSDK.shared.registerPushNotificationToken(token)` from `application(_:didRegisterForRemoteNotificationsWithDeviceToken:)` yourself.
+
+**3. Handling notifications**
+
+```swift
+final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
+    var onSupportReply: (@MainActor (String) -> Void)?
+
+    // Foreground: skip the banner for the conversation already on screen —
+    // polling delivers the reply into the thread.
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
+        if let ticketId = SupportChatNotification.ticketId(from: notification.request.content.userInfo) {
+            let isVisible = await MainActor.run { supportChat.visibleTicketId == ticketId }
+            if isVisible { return [] }
+            Task { @MainActor in try? await supportChat.refreshTickets() }   // fresh unread badges
+        }
+        return [.banner, .list, .sound]
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                didReceive response: UNNotificationResponse) async {
+        if let ticketId = SupportChatNotification.ticketId(from: response.notification.request.content.userInfo) {
+            await onSupportReply?(ticketId)
+        }
+    }
+}
+
+// At launch — keep a strong reference; posthog-ios also needs a delegate set to capture opens:
+UNUserNotificationCenter.current().delegate = notificationDelegate
+```
+
+Present the chat with the tapped ticket. Changing `ticketId` while the chat is on screen navigates to the new ticket, so a tap during an open chat needs no dismissal:
+
+```swift
+@State private var supportTicketId: String?
+@State private var showSupport = false
+
+var body: some View {
+    content
+        .sheet(isPresented: $showSupport) {
+            SupportChatView(client: supportChat, ticketId: supportTicketId)
+        }
+        .task {
+            notificationDelegate.onSupportReply = { ticketId in
+                supportTicketId = ticketId
+                showSupport = true
+            }
+        }
+}
+```
+
+A ticket that does not belong to this device's session is ignored, and the chat opens as usual.
+
+**Reach.** Only people running a build with posthog-ios 3.69.0+ who granted permission can be notified. Everyone else still relies on PostHog's email notifications, sent when they gave an email address.
+
 ## How it works
 
 - **Auth:** the public conversations token is fetched from PostHog's remote config (`/array/<projectApiKey>/config` → `conversations.token`) and sent as `X-Conversations-Token`. No secret keys on device.
 - **Allowed domains:** if your project's Support settings restrict allowed domains, pass one of them as `origin` in the configuration — write endpoints reject native requests without an allowlisted `Origin` header. With an empty domain list, leave it nil.
 - **Access control:** a client-generated `widget_session_id` (stored in the **Keychain**, so ticket history survives app reinstalls) scopes all ticket access; wrong ids get 403.
 - **Identity:** designed for anonymous users. The identification form asks for whatever the project collects — an email, a name, or both — once per session before the first message; declining is allowed and remembered for the session. What is provided is sent as a message trait: it labels tickets in your inbox and, for an email, enables PostHog's reply notifications. Nothing is verified and nothing is merged: ticket access stays keyed to the Keychain-stored session id, so two people who type the same address remain separate, and neither can reach the other's conversations.
-- **New messages:** sent messages are echoed locally from the send response; incoming replies arrive via polling while the conversation is on screen (2s default, configurable via `pollInterval`), plus refresh on demand. No push — use PostHog's email notifications for async replies until [Workflows push notifications](https://github.com/PostHog/posthog/issues/45009) ship for iOS.
+- **New messages:** sent messages are echoed locally from the send response; incoming replies arrive via polling while the conversation is on screen (2s default, configurable via `pollInterval`), plus refresh on demand. Replies that arrive while the chat is closed reach people through a PostHog Workflows push (see [Push notifications for replies](#push-notifications-for-replies)) or PostHog's email notifications.
 - **Device moves:** not covered — the Keychain-stored session survives reinstalls on the same device, which is the common case for anonymous users. PostHog's email-based ticket recovery is currently web-oriented; see `CLAUDE.md` for the verified protocol details if you want to build on it.
 
 ## Endpoint map (verified against the live API)
@@ -254,7 +354,6 @@ Tested end-to-end against the live API (send, poll, agent reply, mark read, rein
 Things this package would support the moment the protocol offers them (see `CLAUDE.md` for the verified protocol details behind each):
 
 - **Ticket tags (write-only) from the client** — e.g. stamping an entry point at creation time. The widget API currently drops a `tags` field silently; the workaround is custom traits (`additionalTraits`), which land on the ticket's `anonymous_traits` but aren't first-class inbox filters.
-- **Push notifications for agent replies** — waiting on [PostHog Workflows push notifications](https://github.com/PostHog/posthog/issues/45009) reaching iOS; polling + email notifications until then.
 - **Attachments** — no upload endpoint in the widget protocol yet.
 - **Realtime transport** — a websocket/SSE channel would replace polling.
 - **Cross-device ticket recovery that can open the app** — the email restore flow exists but is web-oriented today (see `CLAUDE.md`).

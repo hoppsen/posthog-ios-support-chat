@@ -72,6 +72,37 @@ Findings that go beyond the TypeScript types in posthog-js:
   every request for projects that restrict domains; leave it nil when the
   project's domain list is empty (empty = allow all).
 
+## Push notifications for replies (verified October 2026)
+
+Push runs entirely through a PostHog Workflow (see the README recipe); the
+package only routes taps and offers the permission row. Findings:
+
+- `$conversation_message_sent` (a team reply) is a regular event, so a plain
+  event trigger works. Its `distinct_id` is the **replying PostHog user's**,
+  not the customer's, so the push step cannot target `{event.distinct_id}`.
+  The "Get conversation ticket" step (`template-posthog-get-ticket`) returns
+  the customer's `distinct_id`, which is the id sent with the message that
+  created the ticket (`SupportChatContextProvider.distinctId`).
+- `message_content` is the reply's markdown, truncated to 1,000 characters.
+  The workflow's Liquid templating rejects a backslash in any string literal,
+  so markdown escapes (`\.`) cannot be stripped in the push body.
+- The push step sends by raw distinct id to device tokens that posthog-ios
+  registers (3.69.0+ only). A device on an older SDK logs
+  `No active APNS device token found for distinct_id` — nothing is sent and
+  the run does not fail. Whether a token registered after `identify()` is
+  found under the pre-identify id stored on a ticket is untested.
+- PostHog spreads the push step's custom `data` into the top level of the
+  APNs payload beside `aps` (and FCM data lands at the top level of
+  `userInfo` too). The `posthog` key is reserved for open-tracking
+  correlation. `SupportChatNotification` pins the `type` / `ticket_id` keys.
+- Push identity verification needs a server that can vouch for who owns a
+  distinct id; with anonymous, device-generated ids it proves nothing, so it
+  stays disabled for this package's audience.
+
+The posthog-ios 3.69.0 requirement belongs to the app's push setup. Do not add
+posthog-ios as a package dependency to enforce it: SPM would constrain every
+consumer, and the zero-dependency design is deliberate (see Architecture).
+
 ## Why there is no restore / deep-link support (for now)
 
 The web widget offers email-based ticket recovery (`POST .../restore/request`
