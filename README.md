@@ -219,17 +219,36 @@ The package stays dependency-free and never registers for push itself.
 - The **Push Notifications** capability on your app target.
 - An **APNs channel** in PostHog under Workflows → Channels, matching your bundle id. Use Production for TestFlight and App Store builds, Sandbox for builds run from Xcode — a mismatch drops pushes silently. For anonymous users, leave **Identity verification** disabled: it needs a server that knows who owns a distinct id, which an app without accounts does not have.
 
-**1. The workflow**
+**1. The workflows**
 
-Create a workflow with these steps:
+A push step delivers to the person the workflow run belongs to — its "Distinct ID" field only appears in log messages. A reply event belongs to the team member who replied, so a single workflow on it would look for the team member's device. Two workflows hand the reply over to the customer instead:
+
+```
+Team replies in the inbox
+  → $conversation_message_sent        (belongs to the team member)
+      → Workflow A: Get ticket → capture support:reply_received for the customer
+          → support:reply_received    (belongs to the customer)
+              → Workflow B: push to the customer's device
+```
+
+**Workflow A** — "Support reply → customer event":
 
 | Step | Configuration |
 |---|---|
 | Trigger | Event `$conversation_message_sent`, filtered to `channel_source = widget` and `author_type = team` |
 | Get conversation ticket | Ticket ID `{event.properties.ticket_id}` (the default), output variable `ticket` |
-| Push notification | Distinct ID `{variables.ticket.distinct_id}`, your APNs channel, a title such as "New reply from support", body `{{ event.properties.message_content \| strip_html \| truncate: 180 }}`, custom data `{"type": "support_reply", "ticket_id": "{event.properties.ticket_id}"}` |
+| Capture a PostHog event | Event `support:reply_received`, distinct ID `{variables.ticket.distinct_id}`, properties `ticket_id`, `ticket_number`, `message_id`, `message_content` copied from `{event.properties.*}` |
 
-The Get ticket step is required: the reply event's distinct id belongs to the team member who replied, not the customer. The ticket carries the customer's distinct id, which is whatever your `SupportChatContextProvider.distinctId` returned when the ticket was created — so it must return `PostHogSDK.shared.getDistinctId()`, the id the SDK registers the device under. The custom data keys must match `SupportChatNotification`.
+**Workflow B** — "Support reply push (iOS)":
+
+| Step | Configuration |
+|---|---|
+| Trigger | Event `support:reply_received` |
+| Push notification | Distinct ID `{event.distinct_id}`, your **production** APNs channel, a title such as "New reply from support", body `{{ event.properties.message_content \| strip_html \| truncate: 180 }}`, custom data `{"type": "support_reply", "ticket_id": "{event.properties.ticket_id}"}` |
+
+The ticket carries the customer's distinct id: whatever your `SupportChatContextProvider.distinctId` returned when the ticket was created, so it must return `PostHogSDK.shared.getDistinctId()`, the id the SDK registers the device under. The custom data keys must match `SupportChatNotification`.
+
+Select only the production channel in a live workflow. Tokens carry no APNs environment, so with a sandbox channel selected too, every push is also sent to the wrong environment and logs a `BadDeviceToken` error. Add the sandbox channel only while testing a build run from Xcode.
 
 Inbox replies are markdown, so a preview can show escapes such as `\.` (the workflow's Liquid templating rejects backslashes, so they cannot be stripped there). A preview also puts up to 180 characters of the reply on the lock screen. Use a generic body such as "You have a new reply" if replies may be sensitive.
 
@@ -259,13 +278,7 @@ supportChat.onEvent = { event in
 }
 ```
 
-**Deliver the token yourself.** posthog-ios is meant to pick up the device token automatically, but in a SwiftUI app (`@UIApplicationDelegateAdaptor`) it never arrives: the SDK adds its callback to SwiftUI's wrapper delegate after UIKit has already recorded which delegate methods exist, so UIKit never calls it. Implement the callback in your app delegate and pass the token on — the SDK skips a token it already sent:
-
-```swift
-func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-    PostHogSDK.shared.registerPushNotificationToken(deviceToken.map { String(format: "%02x", $0) }.joined())
-}
-```
+posthog-ios picks up the device token from there and stores it on the person.
 
 **3. Handling notifications**
 
