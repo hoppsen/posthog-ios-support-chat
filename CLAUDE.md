@@ -106,8 +106,14 @@ Findings:
   customer's `distinct_id`: the id sent with the message that created the
   ticket (`SupportChatContextProvider.distinctId`).
 - `message_content` is the reply's markdown, truncated to 1,000 characters.
-  The workflow's Liquid templating rejects a backslash in any string literal,
-  so markdown escapes (`\.`) cannot be stripped in the push body.
+  The inbox editor escapes `.`, `[` and `]` (`\.`, `\[date\]`) but not `?`,
+  `,`, `"` or `$`; links arrive as `[text](url)` and bold as `**text**`. The
+  push body's Liquid templating rejects a backslash in any string literal, so
+  workflow A's capture step strips escapes with Hog instead:
+  `{replaceAll(event.properties.message_content, '\\', '')}` (`'\\'` is one
+  backslash). It removes typed backslashes too; an exact
+  "backslash before punctuation" unescape would need ~35 nested `replaceAll`
+  calls, since Hog has no regex replace. Links and bold stay raw.
 - posthog-ios registers device tokens on its own (3.69.0+ only; verified
   in a SwiftUI app, though the token can arrive a launch later). A device
   without a token logs `No active APNS device token found for distinct_id`
@@ -123,6 +129,15 @@ Findings:
   APNs payload beside `aps` (and FCM data lands at the top level of
   `userInfo` too). The `posthog` key is reserved for open-tracking
   correlation. `SupportChatNotification` pins the `type` / `ticket_id` keys.
+- The app's `UNUserNotificationCenterDelegate` methods must stay on the main
+  actor. Async variants made `nonisolated` (a tempting Swift 6 workaround,
+  since the protocol isn't main-actor) finish on a background thread, so
+  their completion handler does too; when a tap brings the app to the
+  foreground, UIKit then takes its state-restoration snapshot off the main
+  thread and aborts (`_performBlockAfterCATransactionCommitSynchronizes`
+  assertion). Taps while the app is already open don't snapshot and work,
+  which hides the bug. Use a `@preconcurrency` conformance with main-actor
+  methods. Verified October 2026 in the simulator with `simctl push`.
 - Push identity verification needs a server that can vouch for who owns a
   distinct id; with anonymous, device-generated ids it proves nothing, so it
   stays disabled for this package's audience.
