@@ -74,8 +74,14 @@ Findings that go beyond the TypeScript types in posthog-js:
 
 ## Push notifications for replies (verified October 2026)
 
-Push runs entirely through PostHog Workflows (see the README recipe); the
-package only routes taps and offers the permission row. Findings:
+Push is sent by PostHog Workflows (see the README recipe). The package
+covers everything on the device that does not depend on the app: the
+permission row, provisional permission on a new ticket, APNs registration,
+foreground banners (`presentationOptions(forReplyTo:)`), badge clearing and
+tap routing (`ReplyNotifications.swift`, UI target, since none of it is
+transport). The app keeps the notification delegate — one per app, shared
+with its other notifications and posthog-ios — and decides how a tap
+presents the chat. Findings:
 
 - `$conversation_message_sent` (a team reply) is a regular event, but it
   belongs to the **replying PostHog user** (its `distinct_id` is theirs).
