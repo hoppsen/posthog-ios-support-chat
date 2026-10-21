@@ -45,9 +45,33 @@ public struct SupportChatUnreadBadge: View {
                                              """))
             }
         }
-        .task { await client.refreshUnreadCount() }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-            Task { await client.refreshUnreadCount() }
-        }
+        .refreshingSupportChatUnreadCount(client)
+    }
+}
+
+public extension View {
+    /// Keeps `client.unreadCount` current while this view is on screen: it
+    /// refreshes when the view appears and whenever the app becomes active. A
+    /// device that never started a conversation makes no request.
+    ///
+    /// Use it for a tab badge. A `TabView` doesn't run a hidden tab's tasks,
+    /// so attach it to the `TabView` itself and read the count on the tab:
+    ///
+    /// ```swift
+    /// TabView {
+    ///     // …
+    ///     SettingsView()
+    ///         .tabItem { Label("Settings", systemImage: "gearshape") }
+    ///         .badge(supportChatClient.unreadCount)
+    /// }
+    /// .refreshingSupportChatUnreadCount(supportChatClient)
+    /// ```
+    ///
+    /// `SupportChatUnreadBadge` does this on its own.
+    func refreshingSupportChatUnreadCount(_ client: SupportChatClient) -> some View {
+        task { await client.refreshUnreadCount() }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+                Task { await client.refreshUnreadCount() }
+            }
     }
 }
