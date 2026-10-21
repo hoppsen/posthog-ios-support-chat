@@ -145,61 +145,35 @@ supportChat.onEvent = { event in
 
 ### Feedback entry point (e.g. a Home Screen quick action)
 
-For entry points that should always reach users — like a "Send Feedback" quick action shown when someone long-presses your app icon — present the chat in its own `UIWindow` so it appears above everything, including full-screen covers a SwiftUI sheet cannot present over:
+For entry points that should always reach users, like a "Send Feedback" quick action shown when someone long-presses your app icon, present the chat in its own window. It then appears above everything, including full-screen covers that a SwiftUI sheet cannot present over:
 
 ```swift
-@MainActor private var overlayWindow: UIWindow?
+// Once, where you create the client: a new window does not inherit the app's tint.
+supportChat.overlayTint = .brandGreen
 
-@MainActor
-func presentFeedbackChat(in scene: UIWindowScene) {
-    guard overlayWindow == nil else { return }
-    supportChat.additionalTraits = ["source": "quick_action"]  // shows up on the ticket in your inbox
+supportChat.presentInOverlay(
+    startNewConversation: true,   // straight into a fresh conversation
+    strings: .init(greeting: LocalizedStringResource("We read every message. What can we do better?",
+                                                     comment: "Support chat greeting for the feedback action")),
+    source: "quick_action"        // shows up on the ticket in your inbox
+)
+```
 
-    let window = UIWindow(windowScene: scene)
-    window.windowLevel = .alert
-    window.rootViewController = UIViewController()
-    window.makeKeyAndVisible()
+One overlay shows at a time; further calls while it is up leave it in place. Presentation is deferred a runloop and retried, so a call during scene activation (for example from a cold-launch quick action) is not lost.
 
-    let chat = SupportChatView(
-        client: supportChat,
-        startNewConversation: true,   // straight into a fresh conversation
-        strings: .init(greeting: LocalizedStringResource("We read every message. What can we do better?",
-                                                         comment: "Support chat greeting for the feedback action"))
-    )
-    .tint(.brandGreen)   // a new window does not inherit the app's environment tint
+### Unread badge
 
-    let host = DismissReportingHostingController(rootView: chat)
-    host.onDismiss = { dismissOverlay() }
-    overlayWindow = window
+Show how many support replies are unread, for example on a "Contact Support" row in Settings:
 
-    // Defer one runloop: presenting synchronously during scene activation can
-    // be silently dropped (e.g. while a system alert holds key after launch).
-    DispatchQueue.main.async {
-        window.rootViewController?.present(host, animated: true)
-        // Self-heal if the presentation was dropped anyway, so the next
-        // attempt is not swallowed by the singleton guard above.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            if host.presentingViewController == nil { dismissOverlay() }
-        }
-    }
-}
-
-@MainActor
-func dismissOverlay() {
-    overlayWindow?.isHidden = true
-    overlayWindow = nil
-}
-
-/// Reports dismissal (close button or swipe) so the window can be torn down.
-private final class DismissReportingHostingController<Content: View>: UIHostingController<Content> {
-    var onDismiss: (() -> Void)?
-
-    override func viewDidDisappear(_ animated: Bool) {
-        super.viewDidDisappear(animated)
-        if isBeingDismissed { onDismiss?() }
-    }
+```swift
+HStack {
+    Label("Contact Support", systemImage: "lifepreserver")
+    Spacer()
+    SupportChatUnreadBadge(client: supportChat)   // red capsule, hidden at zero
 }
 ```
+
+The badge keeps itself current. It refreshes `unreadCount` when it appears and whenever the app becomes active, and the count already follows the chat: opening a conversation marks it read, and a reply that arrives while the app is open refreshes it. On a device that never started a conversation it makes no request. To build your own badge, read `client.unreadCount` (observable) and call `await client.refreshUnreadCount()`.
 
 ### Push notifications for replies
 

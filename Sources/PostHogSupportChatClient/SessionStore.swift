@@ -30,6 +30,10 @@ public struct SessionStore: Sendable {
         return id
     }
 
+    /// Whether this device has a session at all, i.e. ever sent a message or
+    /// saved identification. Without one there are no tickets to fetch.
+    public var hasSession: Bool { read() != nil }
+
     public var email: String? { read()?.email }
     public var name: String? { read()?.name }
     public var currentTicketId: String? { read()?.currentTicketId }

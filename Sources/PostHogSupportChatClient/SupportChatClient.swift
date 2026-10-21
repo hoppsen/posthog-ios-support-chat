@@ -305,6 +305,16 @@ public final class SupportChatClient {
         }
     }
 
+    /// Brings `unreadCount` up to date without opening the chat, e.g. for a
+    /// badge on a "Contact Support" row. Loads the remote config first if
+    /// needed. On a device that never started a conversation it returns
+    /// without any network request; failures leave the count unchanged.
+    public func refreshUnreadCount() async {
+        guard store.hasSession else { return }
+        await start()
+        try? await refreshTickets()
+    }
+
     public func refreshTickets() async throws {
         guard let api else { return }
         let response = try await api.getTickets(widgetSessionId: store.getOrCreateWidgetSessionId())

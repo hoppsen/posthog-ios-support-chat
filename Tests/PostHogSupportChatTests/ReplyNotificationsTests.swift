@@ -63,4 +63,16 @@ final class ReplyNotificationsTests: XCTestCase {
         XCTAssertEqual(client.overlayTint, .red)
         XCTAssertNil(makeClient().overlayTint)
     }
+
+    // MARK: - Unread badge
+
+    func testRefreshUnreadCountWithoutSessionMakesNoRequest() async {
+        // A fresh project key has no Keychain session: refreshUnreadCount must
+        // not even load the remote config.
+        let client = SupportChatClient(configuration: .init(projectApiKey: "phc_no_session_\(UUID().uuidString)"),
+                                       context: Context())
+        await client.refreshUnreadCount()
+        XCTAssertEqual(client.state, .idle)
+        XCTAssertEqual(client.unreadCount, 0)
+    }
 }
