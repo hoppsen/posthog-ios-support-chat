@@ -175,6 +175,18 @@ HStack {
 
 The badge keeps itself current. It refreshes `unreadCount` when it appears and whenever the app becomes active, and the count already follows the chat: opening a conversation marks it read, and a reply that arrives while the app is open refreshes it. On a device that never started a conversation it makes no request. To build your own badge, read `client.unreadCount` (observable) and call `await client.refreshUnreadCount()`.
 
+For a tab bar, badge the tab with the count and attach the refresh to the `TabView` itself, since a `TabView` doesn't run a hidden tab's tasks:
+
+```swift
+TabView {
+    // …
+    SettingsView()
+        .tabItem { Label("Settings", systemImage: "gearshape") }
+        .badge(supportChat.unreadCount)   // 0 hides the badge
+}
+.refreshingSupportChatUnreadCount(supportChat)
+```
+
 ### Push notifications for replies
 
 People rarely sit in the chat waiting for an answer, so replies they never see are the main failure mode of in-app support. PostHog Workflows can push a notification to the customer's device when someone replies from the inbox. The work splits three ways:
