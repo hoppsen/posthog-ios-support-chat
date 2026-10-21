@@ -8,8 +8,9 @@ final class ReplyNotificationsTests: XCTestCase {
         var distinctId: String { "test-distinct-id" }
     }
 
-    private func makeClient() -> SupportChatClient {
-        SupportChatClient(configuration: .init(projectApiKey: "phc_test"), context: Context())
+    private func makeClient(offersReplyNotifications: Bool = false) -> SupportChatClient {
+        SupportChatClient(configuration: .init(projectApiKey: "phc_test", offersReplyNotifications: offersReplyNotifications),
+                          context: Context())
     }
 
     func testReplyGetsABannerWhileNoConversationIsOnScreen() {
@@ -26,13 +27,40 @@ final class ReplyNotificationsTests: XCTestCase {
 
     func testReportForwardsToOnEvent() {
         let client = makeClient()
-        var received: Bool?
+        var received: (granted: Bool, source: NotificationPermissionSource)?
         client.onEvent = { event in
-            if case let .notificationPermissionRequested(granted) = event {
-                received = granted
+            if case let .notificationPermissionRequested(granted, source) = event {
+                received = (granted, source)
             }
         }
-        client.report(.notificationPermissionRequested(granted: true))
-        XCTAssertEqual(received, true)
+        client.report(.notificationPermissionRequested(granted: true, source: .settings))
+        XCTAssertEqual(received?.granted, true)
+        XCTAssertEqual(received?.source, .settings)
+    }
+
+    func testConfigurationDecidesUnlessThePresentationOverrides() {
+        XCTAssertFalse(makeClient().offersReplyNotifications)
+        XCTAssertTrue(makeClient(offersReplyNotifications: true).offersReplyNotifications)
+    }
+
+    func testEachClientHasOnePermissionModel() {
+        let client = makeClient()
+        XCTAssertTrue(client.notificationPermission === client.notificationPermission)
+        XCTAssertFalse(client.notificationPermission === makeClient().notificationPermission)
+    }
+
+    func testPermissionIsUnknownUntilRead() {
+        let permission = makeClient().notificationPermission
+        XCTAssertNil(permission.status)
+        XCTAssertFalse(permission.canRequest)
+        XCTAssertFalse(permission.allowsDelivery)
+        XCTAssertEqual(permission.analyticsValue, "unknown")
+    }
+
+    func testOverlayTintIsPerClient() {
+        let client = makeClient()
+        client.overlayTint = .red
+        XCTAssertEqual(client.overlayTint, .red)
+        XCTAssertNil(makeClient().overlayTint)
     }
 }

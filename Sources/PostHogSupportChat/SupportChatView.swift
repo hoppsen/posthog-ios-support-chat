@@ -60,20 +60,20 @@ public struct SupportChatView: View {
     ///     (see the README). The chat then quietly requests provisional
     ///     permission when a message creates a ticket, offers a "Get notified
     ///     when we reply" row in conversations while the permission is
-    ///     undecided or provisional (tapping it calls
-    ///     `requestNotificationPermission()` and reports
-    ///     `Event.notificationPermissionRequested`), and clears the app icon
-    ///     badge when it appears.
+    ///     undecided or provisional (tapping it requests permission with
+    ///     source `.chat`), and clears the app icon badge when it appears.
+    ///     Nil follows `SupportChatConfiguration.offersReplyNotifications`,
+    ///     usually the better place to turn it on once for every entry point.
     public init(client: SupportChatClient,
                 ticketId: String? = nil,
                 startNewConversation: Bool = false,
                 strings: SupportChatStrings = .init(),
-                offersReplyNotifications: Bool = false) {
+                offersReplyNotifications: Bool? = nil) {
         self.client = client
         self.ticketId = ticketId
         self.startNewConversation = startNewConversation
         self.strings = strings
-        replyNotifications = offersReplyNotifications ? .builtIn : .off
+        replyNotifications = (offersReplyNotifications ?? client.offersReplyNotifications) ? .builtIn : .off
     }
 
     /// The 0.5.0 form: shows the "Get notified when we reply" row and calls

@@ -1,6 +1,5 @@
 import PostHogSupportChatClient
 import SwiftUI
-import UserNotifications
 
 /// The message thread + composer for the active ticket.
 struct ConversationView: View {
@@ -8,10 +7,6 @@ struct ConversationView: View {
     var strings: SupportChatStrings = .init()
     var replyNotifications: ReplyNotificationsMode = .off
     @State private var draft = ""
-    /// Nil until read. The prompt shows only in the states where iOS will
-    /// still present its permission dialog: undecided, and provisional (quiet
-    /// delivery an app may request without asking, which the dialog upgrades).
-    @State private var notificationStatus: UNAuthorizationStatus?
     @FocusState private var composerFocused: Bool
 
     private var placeholder: String {
@@ -45,7 +40,7 @@ struct ConversationView: View {
         .onDisappear { client.stopPolling() }
         .task {
             guard replyNotifications != .off else { return }
-            await refreshNotificationStatus()
+            await client.notificationPermission.refresh()
         }
     }
 
@@ -53,7 +48,8 @@ struct ConversationView: View {
     /// first message there is nothing to reply to.
     private var showsNotificationPrompt: Bool {
         replyNotifications != .off
-            && (notificationStatus == .notDetermined || notificationStatus == .provisional)
+            // Only while iOS will still show its dialog.
+            && client.notificationPermission.canRequest
             && client.currentTicketId != nil
             && !client.notificationPromptDeclined
     }
@@ -67,10 +63,7 @@ struct ConversationView: View {
                 .font(.subheadline)
             Spacer(minLength: 0)
             Button {
-                Task {
-                    await requestNotifications()
-                    await refreshNotificationStatus()
-                }
+                Task { await requestNotifications() }
             } label: {
                 Text("Turn on", bundle: .module,
                      comment: "Button that enables push notifications for support replies. Keep it short.")
@@ -97,15 +90,11 @@ struct ConversationView: View {
         case .off:
             break
         case .builtIn:
-            let granted = await client.requestNotificationPermission()
-            client.report(.notificationPermissionRequested(granted: granted))
+            await client.notificationPermission.request(source: .chat)
         case let .custom(request):
             await request()
+            await client.notificationPermission.refresh()
         }
-    }
-
-    private func refreshNotificationStatus() async {
-        notificationStatus = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
     }
 
     /// Resolved conversations stay readable but closed for replies —
@@ -210,8 +199,7 @@ struct ConversationView: View {
                 try await client.sendMessage(text)
                 // A ticket now exists to be notified about.
                 if isFirstMessage, replyNotifications == .builtIn {
-                    await client.requestProvisionalNotificationPermission()
-                    await refreshNotificationStatus()
+                    await client.notificationPermission.requestProvisional()
                 }
             } catch {
                 // Give the text back for retry — unless the user already

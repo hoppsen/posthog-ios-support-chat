@@ -47,17 +47,24 @@ public struct SupportChatConfiguration: Sendable {
     /// not allowlisted. Browsers set this header automatically; URLSession
     /// does not. Leave nil when the project's domain list is empty.
     public let origin: URL?
+    /// Whether `SupportChatView` offers reply notifications: a "Get notified
+    /// when we reply" row, quiet provisional permission when a message
+    /// creates a ticket, and badge clearing. Turn it on for apps that push
+    /// support replies (see the README); a presentation can still override it.
+    public let offersReplyNotifications: Bool
 
     public init(projectApiKey: String,
                 host: Host = .us,
                 pollInterval: TimeInterval = 2,
                 origin: URL? = nil,
-                usesDashboardStrings: Bool = false) {
+                usesDashboardStrings: Bool = false,
+                offersReplyNotifications: Bool = false) {
         self.projectApiKey = projectApiKey
         self.host = host
         self.pollInterval = max(1, pollInterval)
         self.origin = origin
         self.usesDashboardStrings = usesDashboardStrings
+        self.offersReplyNotifications = offersReplyNotifications
     }
 }
 

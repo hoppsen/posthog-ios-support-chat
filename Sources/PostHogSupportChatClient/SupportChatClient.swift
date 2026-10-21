@@ -28,9 +28,13 @@ public final class SupportChatClient {
         /// person profile as `email` and `name`, the unprefixed properties
         /// PostHog uses to display a person.
         case identificationSubmitted(email: String?, name: String?)
-        /// The user tapped "Turn on" in the chat's "Get notified when we
-        /// reply" row and answered the permission dialog.
-        case notificationPermissionRequested(granted: Bool)
+        /// Full notification permission was requested, from the chat's "Get
+        /// notified when we reply" row or from the app (e.g. a Settings row).
+        /// `granted` is the answer, or the existing permission when iOS no
+        /// longer shows its dialog.
+        case notificationPermissionRequested(granted: Bool, source: NotificationPermissionSource)
+        /// A support-reply notification was tapped and its conversation opened.
+        case replyNotificationOpened(ticketId: String)
     }
 
     public private(set) var state: State = .idle
@@ -86,6 +90,10 @@ public final class SupportChatClient {
     package func report(_ event: Event) {
         onEvent?(event)
     }
+
+    /// Whether `SupportChatView` offers reply notifications unless a
+    /// presentation says otherwise (`SupportChatConfiguration.offersReplyNotifications`).
+    package var offersReplyNotifications: Bool { configuration.offersReplyNotifications }
 
     // MARK: - Dashboard-configured copy
 
@@ -377,4 +385,14 @@ private extension String {
         let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
     }
+}
+
+/// Where a request for notification permission came from, for analytics.
+public enum NotificationPermissionSource: Sendable, Hashable {
+    /// The chat's "Get notified when we reply" row.
+    case chat
+    /// A Settings row in the app.
+    case settings
+    /// Any other entry point.
+    case custom(String)
 }
