@@ -75,4 +75,41 @@ final class ReplyNotificationsTests: XCTestCase {
         XCTAssertEqual(client.state, .idle)
         XCTAssertEqual(client.unreadCount, 0)
     }
+
+    // MARK: - Reusing an open chat
+
+    func testTappedReplyNavigatesAChatThatIsAlreadyPresented() {
+        let client = makeClient()
+        let routing = SupportChatUIState.of(client).routing
+        routing.chatAppeared()
+
+        client.openReplyNotification(ticketId: "ticket-a")
+
+        XCTAssertEqual(routing.request?.ticketId, "ticket-a")
+        XCTAssertNil(SupportChatUIState.of(client).overlayWindow, "no second chat on top")
+    }
+
+    func testTappedReplyWithoutAPresentedChatDoesNotRoute() {
+        let client = makeClient()
+        client.openReplyNotification(ticketId: "ticket-a")
+        XCTAssertNil(SupportChatUIState.of(client).routing.request)
+    }
+
+    func testRepeatedRequestsForTheSameTicketAreDistinct() {
+        let routing = SupportChatUIState.of(makeClient()).routing
+        routing.open(ticketId: "ticket-a")
+        let first = routing.request
+        routing.open(ticketId: "ticket-a")
+        XCTAssertNotEqual(first, routing.request)
+    }
+
+    func testPresentedChatCountNeverGoesNegative() {
+        let routing = SupportChatUIState.of(makeClient()).routing
+        routing.chatDisappeared()
+        XCTAssertFalse(routing.isChatPresented)
+        routing.chatAppeared()
+        routing.chatAppeared()
+        routing.chatDisappeared()
+        XCTAssertTrue(routing.isChatPresented)
+    }
 }

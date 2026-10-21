@@ -203,10 +203,39 @@ final class SupportChatUIState {
     }
 
     let permission: SupportChatNotificationPermission
+    let routing = SupportChatRouting()
     var overlayWindow: UIWindow?
     var overlayTint: Color?
 
     private init(client: SupportChatClient) {
         permission = SupportChatNotificationPermission(client: client)
+    }
+}
+
+/// Lets a tapped reply reuse a chat that is already on screen instead of
+/// stacking an overlay on top of it. Every `SupportChatView` counts itself
+/// while it is presented and follows `request`.
+@MainActor
+@Observable
+final class SupportChatRouting {
+    struct Request: Equatable {
+        let ticketId: String
+        /// Distinguishes two requests for the same ticket, so each one navigates.
+        let id = UUID()
+    }
+
+    /// Number of `SupportChatView`s currently presented. A chat stays
+    /// presented while the app is in the background, which is exactly the
+    /// case a tapped reply should reuse.
+    private(set) var presentedChats = 0
+    private(set) var request: Request?
+
+    var isChatPresented: Bool { presentedChats > 0 }
+
+    func chatAppeared() { presentedChats += 1 }
+    func chatDisappeared() { presentedChats = max(0, presentedChats - 1) }
+
+    func open(ticketId: String) {
+        request = Request(ticketId: ticketId)
     }
 }

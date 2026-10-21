@@ -38,6 +38,9 @@ public struct SupportChatView: View {
     // user's conversation for the ticket list the moment their first send
     // creates a ticket.
     @State private var rootShowsConversation = false
+    /// The ticket a tapped reply routed this presentation to; wins over
+    /// `ticketId` (see `SupportChatClient.openReplyNotification`).
+    @State private var routedTicketId: String?
     @Environment(\.dismiss) private var dismiss
 
     /// - Parameters:
@@ -121,6 +124,15 @@ public struct SupportChatView: View {
             guard newValue != nil, didAutoOpen else { return }
             Task { await openRequestedTicketRefreshingIfNeeded() }
         }
+        .onChange(of: routing.request) { _, request in
+            guard let request else { return }
+            routedTicketId = request.ticketId
+            // Before the initial load finishes, the auto-open picks it up.
+            guard didAutoOpen else { return }
+            Task { await openRequestedTicketRefreshingIfNeeded() }
+        }
+        .onAppear { routing.chatAppeared() }
+        .onDisappear { routing.chatDisappeared() }
         .sheet(isPresented: $showIdentificationForm,
                onDismiss: {
                    // Swipe-dismissal counts as declining — the ask is optional
@@ -210,7 +222,7 @@ public struct SupportChatView: View {
         // refresh would leave the ticket list visible for a whole round-trip.
         // A requested ticket missing from the cache waits for the refresh,
         // or the cached auto-open would land somewhere else first.
-        if client.hasLoadedTickets, ticketId == nil || requestedTicket != nil {
+        if client.hasLoadedTickets, effectiveTicketId == nil || requestedTicket != nil {
             autoOpenIfNeeded()
         }
 
@@ -248,9 +260,13 @@ public struct SupportChatView: View {
     /// ticket from another session would only produce a 403 and an empty
     /// thread with a composer that cannot send.
     private var requestedTicket: Ticket? {
-        guard let ticketId else { return nil }
-        return client.tickets.first { $0.id == ticketId }
+        guard let effectiveTicketId else { return nil }
+        return client.tickets.first { $0.id == effectiveTicketId }
     }
+
+    private var effectiveTicketId: String? { routedTicketId ?? ticketId }
+
+    private var routing: SupportChatRouting { SupportChatUIState.of(client).routing }
 
     /// Replaces the navigation stack with the requested ticket. Returns false
     /// when there is nothing to open.
