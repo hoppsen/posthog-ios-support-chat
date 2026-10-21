@@ -66,14 +66,23 @@ public extension SupportChatClient {
         }
     }
 
-    /// Opens the conversation a tapped reply notification is about, above
-    /// whatever the app is showing, and reports
-    /// `Event.replyNotificationOpened`. Get the id from
-    /// `SupportChatNotification.ticketId(from:)`. A tap while the chat is
-    /// already up leaves it in place; its ticket list shows the new reply.
+    /// Opens the conversation a tapped reply notification is about and
+    /// reports `Event.replyNotificationOpened`. Get the id from
+    /// `SupportChatNotification.ticketId(from:)`.
+    ///
+    /// When a `SupportChatView` is already presented, for example in a sheet
+    /// the user left open before sending the app to the background, that chat
+    /// navigates to the ticket. Otherwise the chat opens in its own window
+    /// above whatever the app is showing (`presentInOverlay`). Either way
+    /// there is one chat to dismiss, not two.
     func openReplyNotification(ticketId: String) {
         report(.replyNotificationOpened(ticketId: ticketId))
-        presentInOverlay(ticketId: ticketId, source: "reply_notification")
+        let routing = SupportChatUIState.of(self).routing
+        if routing.isChatPresented {
+            routing.open(ticketId: ticketId)
+        } else {
+            presentInOverlay(ticketId: ticketId, source: "reply_notification")
+        }
     }
 
     private func dismissOverlay() {

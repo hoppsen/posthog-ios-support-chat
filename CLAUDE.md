@@ -175,6 +175,17 @@ first-class mobile support upstream rather than ship the browser-oriented
 flow. The endpoint shapes and requirements above are the hard-won part —
 start from them if you re-add it.
 
+## Tapped replies and an open chat
+
+`openReplyNotification(ticketId:)` reuses a chat that is already presented
+(e.g. a sheet left open when the app went to the background) by routing it
+to the ticket, and only opens the overlay window when none is. Without that,
+a tap stacked a second chat on top, and people had to dismiss both.
+`SupportChatRouting` (in `SupportChatUIState`) counts presented
+`SupportChatView`s via onAppear/onDisappear and carries the request; a
+presented sheet stays "presented" while the app is backgrounded, which is the
+case this is for.
+
 ## Unread count
 
 `unreadCount` sums the per-ticket `unread_count` from `GET .../tickets` (replies
