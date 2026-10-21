@@ -6,7 +6,7 @@ import UserNotifications
 struct ConversationView: View {
     let client: SupportChatClient
     var strings: SupportChatStrings = .init()
-    var requestNotifications: (@MainActor () async -> Void)?
+    var replyNotifications: ReplyNotificationsMode = .off
     @State private var draft = ""
     /// Nil until read. The prompt shows only in the states where iOS will
     /// still present its permission dialog: undecided, and provisional (quiet
@@ -44,7 +44,7 @@ struct ConversationView: View {
         .onAppear { client.startPolling() }
         .onDisappear { client.stopPolling() }
         .task {
-            guard requestNotifications != nil else { return }
+            guard replyNotifications != .off else { return }
             await refreshNotificationStatus()
         }
     }
@@ -52,7 +52,7 @@ struct ConversationView: View {
     /// Asks only once there is a ticket to be notified about — before the
     /// first message there is nothing to reply to.
     private var showsNotificationPrompt: Bool {
-        requestNotifications != nil
+        replyNotifications != .off
             && (notificationStatus == .notDetermined || notificationStatus == .provisional)
             && client.currentTicketId != nil
             && !client.notificationPromptDeclined
@@ -68,7 +68,7 @@ struct ConversationView: View {
             Spacer(minLength: 0)
             Button {
                 Task {
-                    await requestNotifications?()
+                    await requestNotifications()
                     await refreshNotificationStatus()
                 }
             } label: {
@@ -90,6 +90,18 @@ struct ConversationView: View {
         .padding(.horizontal, 16)
         .padding(.top, 12)
         .background(.bar)
+    }
+
+    private func requestNotifications() async {
+        switch replyNotifications {
+        case .off:
+            break
+        case .builtIn:
+            let granted = await client.requestNotificationPermission()
+            client.report(.notificationPermissionRequested(granted: granted))
+        case let .custom(request):
+            await request()
+        }
     }
 
     private func refreshNotificationStatus() async {
@@ -192,9 +204,15 @@ struct ConversationView: View {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         draft = ""
+        let isFirstMessage = client.currentTicketId == nil
         Task {
             do {
                 try await client.sendMessage(text)
+                // A ticket now exists to be notified about.
+                if isFirstMessage, replyNotifications == .builtIn {
+                    await client.requestProvisionalNotificationPermission()
+                    await refreshNotificationStatus()
+                }
             } catch {
                 // Give the text back for retry — unless the user already
                 // started typing something new.

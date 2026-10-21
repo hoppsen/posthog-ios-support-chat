@@ -19,5 +19,6 @@ let package = Package(
             resources: [.process("Resources")]
         ),
         .testTarget(name: "PostHogSupportChatClientTests", dependencies: ["PostHogSupportChatClient"]),
+        .testTarget(name: "PostHogSupportChatTests", dependencies: ["PostHogSupportChat"]),
     ]
 )

@@ -1,5 +1,6 @@
 import PostHogSupportChatClient
 import SwiftUI
+import UserNotifications
 
 /// Navigation targets within the support chat stack.
 enum SupportRoute: Hashable {
@@ -25,7 +26,7 @@ public struct SupportChatView: View {
     private let ticketId: String?
     private let startNewConversation: Bool
     private let strings: SupportChatStrings
-    private let requestNotifications: (@MainActor () async -> Void)?
+    private let replyNotifications: ReplyNotificationsMode
     @State private var path: [SupportRoute] = []
     @State private var showIdentificationForm = false
     @State private var didAutoOpen = false
@@ -55,22 +56,40 @@ public struct SupportChatView: View {
     ///     feedback action. Anything left unset falls back to those
     ///     translations, or to the dashboard's copy for a project that opts
     ///     into `usesDashboardStrings`.
-    ///   - requestNotifications: enables a "Get notified when we reply" row
-    ///     in conversations that have a ticket, shown while the app's
-    ///     notification permission is undecided or provisional. Tapping it
-    ///     calls this closure, which should request full authorization and
-    ///     call `registerForRemoteNotifications()`. The package never
-    ///     registers for push itself — the app owns push setup.
+    ///   - offersReplyNotifications: for apps that push support replies
+    ///     (see the README). The chat then quietly requests provisional
+    ///     permission when a message creates a ticket, offers a "Get notified
+    ///     when we reply" row in conversations while the permission is
+    ///     undecided or provisional (tapping it calls
+    ///     `requestNotificationPermission()` and reports
+    ///     `Event.notificationPermissionRequested`), and clears the app icon
+    ///     badge when it appears.
     public init(client: SupportChatClient,
                 ticketId: String? = nil,
                 startNewConversation: Bool = false,
                 strings: SupportChatStrings = .init(),
-                requestNotifications: (@MainActor () async -> Void)? = nil) {
+                offersReplyNotifications: Bool = false) {
         self.client = client
         self.ticketId = ticketId
         self.startNewConversation = startNewConversation
         self.strings = strings
-        self.requestNotifications = requestNotifications
+        replyNotifications = offersReplyNotifications ? .builtIn : .off
+    }
+
+    /// The 0.5.0 form: shows the "Get notified when we reply" row and calls
+    /// `requestNotifications` on tap, without the provisional request or
+    /// badge clearing.
+    @available(*, deprecated, message: "Use offersReplyNotifications: true, which also requests provisional permission and clears the badge.")
+    public init(client: SupportChatClient,
+                ticketId: String? = nil,
+                startNewConversation: Bool = false,
+                strings: SupportChatStrings = .init(),
+                requestNotifications: (@MainActor () async -> Void)?) {
+        self.client = client
+        self.ticketId = ticketId
+        self.startNewConversation = startNewConversation
+        self.strings = strings
+        replyNotifications = requestNotifications.map { .custom($0) } ?? .off
     }
 
     public var body: some View {
@@ -94,6 +113,10 @@ public struct SupportChatView: View {
                 }
         }
         .task { await startAndAutoOpen() }
+        .task {
+            guard replyNotifications == .builtIn else { return }
+            try? await UNUserNotificationCenter.current().setBadgeCount(0)
+        }
         .onChange(of: ticketId) { _, newValue in
             guard newValue != nil, didAutoOpen else { return }
             Task { await openRequestedTicketRefreshingIfNeeded() }
@@ -144,7 +167,7 @@ public struct SupportChatView: View {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if rootShowsConversation {
-                ConversationView(client: client, strings: strings, requestNotifications: requestNotifications)
+                ConversationView(client: client, strings: strings, replyNotifications: replyNotifications)
             } else {
                 TicketListView(client: client, path: $path, strings: strings)
             }
@@ -155,12 +178,12 @@ public struct SupportChatView: View {
     private func destination(for route: SupportRoute) -> some View {
         switch route {
         case let .ticket(id, number):
-            ConversationView(client: client, strings: strings, requestNotifications: requestNotifications)
+            ConversationView(client: client, strings: strings, replyNotifications: replyNotifications)
                 .task { try? await client.openTicket(id) }
                 .navigationTitle(ticketTitle(number: number))
                 .navigationBarTitleDisplayMode(.inline)
         case .newConversation:
-            ConversationView(client: client, strings: strings, requestNotifications: requestNotifications)
+            ConversationView(client: client, strings: strings, replyNotifications: replyNotifications)
                 .onAppear { client.prepareNewConversation() }
                 .navigationTitle(Text("New conversation", bundle: .module,
                                       comment: "Navigation title of the screen that starts a new support conversation."))
@@ -243,5 +266,21 @@ public struct SupportChatView: View {
         // A ticket created since the last fetch is not cached yet.
         try? await client.refreshTickets()
         openRequestedTicket()
+    }
+}
+
+/// How a presentation offers reply notifications.
+enum ReplyNotificationsMode: Equatable {
+    case off
+    /// The package asks for permission and reports the answer.
+    case builtIn
+    /// The deprecated 0.5.0 closure.
+    case custom(@MainActor () async -> Void)
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        switch (lhs, rhs) {
+        case (.off, .off), (.builtIn, .builtIn): true
+        default: false
+        }
     }
 }

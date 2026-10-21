@@ -208,14 +208,14 @@ People rarely sit in the chat waiting for an answer, so replies they never see a
 | Who | Does what |
 |---|---|
 | PostHog | A workflow sends the push when your team replies |
-| Your app | Push setup: capability, permission, registering with iOS, the notification delegate, presenting the chat |
-| This package | Opens the right ticket from a tap, tells you which ticket is on screen, and can offer a "Get notified when we reply" row |
+| Your app | The Push Notifications capability, the notification delegate, presenting the chat from a tap, and an optional Settings row |
+| This package | Asks for permission (a "Get notified when we reply" row, plus quiet provisional permission on a new ticket), registers with iOS, decides foreground banners, clears the badge, and opens the right ticket from a tap |
 
-The package stays dependency-free and never registers for push itself.
+The package stays dependency-free: posthog-ios uploads the device token on its own once the package registers.
 
 **Requirements**
 
-- **posthog-ios 3.69.0 or newer in your app.** That is the first version that registers device tokens with PostHog (automatically, once your app calls `registerForRemoteNotifications()`). Older SDK versions leave the device unreachable, and the workflow logs `No active APNS device token found for distinct_id`.
+- **posthog-ios 3.69.0 or newer in your app.** That is the first version that registers device tokens with PostHog (automatically, once the app registers for remote notifications). Older SDK versions leave the device unreachable, and the workflow logs `No active APNS device token found for distinct_id`.
 - The **Push Notifications** capability on your app target.
 - An **APNs channel** in PostHog under Workflows → Channels, matching your bundle id. Use Production for TestFlight and App Store builds, Sandbox for builds run from Xcode — a mismatch drops pushes silently. For anonymous users, leave **Identity verification** disabled: it needs a server that knows who owns a distinct id, which an app without accounts does not have.
 
@@ -263,19 +263,17 @@ What to set up, and what each piece buys you. The reference code below has all o
 | Piece | | Without it |
 |---|---|---|
 | posthog-ios 3.69.0+, Push Notifications capability | Required | The device never registers; PostHog has nowhere to send |
-| `requestReplyNotifications()` via `requestNotifications:` | Required | Nobody is asked; only provisional permission (if set up) can reach people |
+| `SupportChatView(…, offersReplyNotifications: true)` | Required | Nobody is asked: no "Turn on" row, no provisional permission, no badge clearing |
 | Notification delegate set in `didFinishLaunching` | Required | Taps do nothing, and a tap that cold-launches the app is lost; posthog-ios can't record opens |
-| `handleNotificationTap` → `chatView(ticketId:)` | Required | A tap opens the app, not the conversation |
-| `requestProvisionalReplyNotifications()` on a new ticket | Recommended | People who never tap "Turn on" get no notification at all |
-| `refreshPushRegistration()` at launch | Recommended | A rotated APNs token goes stale until permission is requested again |
-| A Settings row (`NotificationsSettingsRow`) | Recommended | After a "Don't Allow" there is no way back in the app |
-| `presentationOptions(for:)` | Optional | A banner also shows for the conversation already on screen |
-| Badge clearing in `chatView` | Optional | The badge the workflow sets stays on the app icon |
+| A tap → `SupportChatView(ticketId:)` | Required | A tap opens the app, not the conversation |
+| `client.refreshPushRegistration()` at launch | Recommended | A rotated APNs token goes stale until permission is requested again |
+| A Settings row calling `client.requestNotificationPermission()` | Recommended | After a "Don't Allow" there is no way back in the app |
+| `client.presentationOptions(forReplyTo:)` in `willPresent` | Optional | A banner also shows for the conversation already on screen |
 
-posthog-ios picks up the device token on its own once the app registers, and stores it on the person. Keep `aps-environment` at `development` in the entitlements file: App Store and TestFlight exports replace it with the distribution profile's `production`.
+Keep `aps-environment` at `development` in the entitlements file: App Store and TestFlight exports replace it with the distribution profile's `production`.
 
 <details>
-<summary><b>Reference implementation</b> — <code>SupportChatService</code>, app delegate, Settings row (compiles against 0.5.0)</summary>
+<summary><b>Reference implementation</b> — <code>SupportChatService</code>, app delegate, Settings row (compiles against 0.6.0)</summary>
 
 ```swift
 import PostHog
@@ -291,69 +289,21 @@ enum SupportChatService {
         let client = SupportChatClient(configuration: .init(projectApiKey: "phc_...", host: .us),
                                        context: PostHogContext())
         client.onEvent = { event in
-            // Quiet permission on a new conversation: replies land in Notification Center
-            // even if the person never taps "Turn on". Shows no dialog.
-            if case .messageSent(_, isNewTicket: true) = event {
-                Task { await requestProvisionalReplyNotifications() }
+            if case let .notificationPermissionRequested(granted) = event {
+                // Track the chat row's answer, e.g. PostHogSDK.shared.capture(...)
+                _ = granted
             }
         }
         return client
     }()
 
-    /// The one place the chat is created, so every entry point gets the
-    /// "Get notified when we reply" row and clears the reply badge.
+    /// The one place the chat is created, so every entry point offers reply notifications.
     static func chatView(ticketId: String? = nil) -> some View {
-        SupportChatView(client: client,
-                        ticketId: ticketId,
-                        requestNotifications: { await requestReplyNotifications() })
-            .task { try? await UNUserNotificationCenter.current().setBadgeCount(0) }
-    }
-
-    // MARK: - Permission and registration
-
-    /// Full permission (banners and sound). Called from the chat row and a Settings row.
-    static func requestReplyNotifications() async {
-        let granted = (try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])) ?? false
-        guard granted else { return }
-        UIApplication.shared.registerForRemoteNotifications()
-    }
-
-    /// Provisional permission, only while the person has not decided yet.
-    static func requestProvisionalReplyNotifications() async {
-        let center = UNUserNotificationCenter.current()
-        guard await center.notificationSettings().authorizationStatus == .notDetermined,
-              await (try? center.requestAuthorization(options: [.alert, .sound, .badge, .provisional])) == true else { return }
-        UIApplication.shared.registerForRemoteNotifications()
-    }
-
-    /// Call at launch: APNs tokens can change, and registering again is cheap.
-    static func refreshPushRegistration() async {
-        let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
-        guard [.authorized, .provisional, .ephemeral].contains(status) else { return }
-        UIApplication.shared.registerForRemoteNotifications()
-    }
-
-    // MARK: - Handling notifications
-
-    /// Foreground: no banner for the conversation already on screen (polling shows the
-    /// reply in the thread); for any other reply, refresh the list's unread badges.
-    static func presentationOptions(for userInfo: [AnyHashable: Any]) -> UNNotificationPresentationOptions {
-        guard let ticketId = SupportChatNotification.ticketId(from: userInfo) else { return [.banner, .list, .sound] }
-        if client.visibleTicketId == ticketId { return [] }
-        Task { try? await client.refreshTickets() }
-        return [.banner, .list, .sound]
+        SupportChatView(client: client, ticketId: ticketId, offersReplyNotifications: true)
     }
 
     /// Set by your UI to present `chatView(ticketId:)`, e.g. as a sheet.
     static var onReplyTapped: ((String) -> Void)?
-
-    /// Returns false when the tapped notification is not a support reply.
-    @discardableResult
-    static func handleNotificationTap(userInfo: [AnyHashable: Any]) -> Bool {
-        guard let ticketId = SupportChatNotification.ticketId(from: userInfo) else { return false }
-        onReplyTapped?(ticketId)
-        return true
-    }
 
     private struct PostHogContext: SupportChatContextProvider {
         var distinctId: String { PostHogSDK.shared.getDistinctId() }
@@ -367,23 +317,31 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         // Before launch finishes, or a tap that cold-launches the app is lost.
         // posthog-ios also needs a delegate in place to capture notification opens.
         UNUserNotificationCenter.current().delegate = self
-        Task { await SupportChatService.refreshPushRegistration() }
+        Task { await SupportChatService.client.refreshPushRegistration() }
         return true
     }
 
-    func userNotificationCenter(_ center: UNUserNotificationCenter,
-                                willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
-        SupportChatService.presentationOptions(for: notification.request.content.userInfo)
+    // `nonisolated` with only the ticket id crossing to the main actor keeps
+    // Swift 6 happy: UNNotification is not Sendable.
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                            willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
+        guard let ticketId = SupportChatNotification.ticketId(from: notification.request.content.userInfo) else {
+            return [.banner, .list, .sound] // your other notifications
+        }
+        return await SupportChatService.client.presentationOptions(forReplyTo: ticketId)
     }
 
-    func userNotificationCenter(_ center: UNUserNotificationCenter,
-                                didReceive response: UNNotificationResponse) async {
-        SupportChatService.handleNotificationTap(userInfo: response.notification.request.content.userInfo)
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                            didReceive response: UNNotificationResponse) async {
+        guard let ticketId = SupportChatNotification.ticketId(from: response.notification.request.content.userInfo) else { return }
+        await MainActor.run { SupportChatService.onReplyTapped?(ticketId) }
     }
 }
 
 /// A Settings row: the way back after a "Don't Allow", and a second place to opt in.
 struct NotificationsSettingsRow: View {
+    /// Pass whether the chat is open on top of this screen; see below.
+    var isSupportChatPresented = false
     @State private var status: UNAuthorizationStatus?
     @Environment(\.scenePhase) private var scenePhase
 
@@ -393,7 +351,7 @@ struct NotificationsSettingsRow: View {
             case .notDetermined, .provisional:
                 // iOS can still show its dialog.
                 Task {
-                    await SupportChatService.requestReplyNotifications()
+                    await SupportChatService.client.requestNotificationPermission()
                     await refresh()
                 }
             default:
@@ -407,7 +365,10 @@ struct NotificationsSettingsRow: View {
         }
         .task { await refresh() }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Task { await refresh() } } // back from the system settings
+            if phase == .active { Task { await refresh() } } // back from the system settings or a dialog
+        }
+        .onChange(of: isSupportChatPresented) { _, isPresented in
+            if !isPresented { Task { await refresh() } }
         }
     }
 
@@ -451,8 +412,11 @@ var body: some View {
 Behavior worth knowing:
 
 - **The "Get notified when we reply" row** appears once a conversation has a ticket, while permission is undecided or provisional. × hides it until the next launch. After a "Don't Allow", iOS never shows its dialog again, so the row disappears for good. That's what the Settings row is for.
+- **Provisional permission** is requested, without a dialog, when a message creates a ticket and the person has not decided yet. Replies then land quietly in Notification Center; the row keeps offering banners and sound.
+- **Refresh the Settings row when the chat closes** if the chat opens from the same screen (`isSupportChatPresented` above). The chat changes the permission (quietly on the first message, or through "Turn on") while that screen stays underneath, so neither the row's first read nor the return-to-foreground refresh notices.
 - **A ticket that doesn't belong to this device's session** is ignored, and the chat opens as usual.
-- **Mirror the moments into your analytics** if you like: capture an event in `requestReplyNotifications()` (with whether it was granted and which row asked) and in `handleNotificationTap` (with the ticket id). posthog-ios also records `$push_notification_opened` automatically.
+- **Mirror the moments into your analytics** if you like: `onEvent` reports `.notificationPermissionRequested(granted:)` for the chat row; capture the Settings row's answer (the return value of `requestNotificationPermission()`) and taps (the ticket id) yourself. posthog-ios also records `$push_notification_opened` automatically.
+- **Upgrading from 0.5.0:** replace `requestNotifications: { … }` with `offersReplyNotifications: true` and drop your own permission, provisional, registration, presentation and badge code in favor of the client methods above. The closure form still compiles, deprecated. `Event` gained a case, so an exhaustive `switch` over it needs one more branch.
 
 **Reach.** Only people running a build with posthog-ios 3.69.0+ who granted permission can be notified. Everyone else still relies on PostHog's email notifications, sent when they gave an email address.
 
