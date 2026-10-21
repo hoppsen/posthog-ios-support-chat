@@ -20,6 +20,15 @@ public enum TipTapRenderer {
         return AttributedString(message.content)
     }
 
+    /// One-line plain text for a conversation preview. Inbox replies are
+    /// markdown, so escapes (`\.`), links and emphasis are resolved to the
+    /// text a reader sees; text that isn't valid markdown stays as it is.
+    static func plainPreview(_ markdown: String) -> String {
+        let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+        guard let parsed = try? AttributedString(markdown: markdown, options: options) else { return markdown }
+        return String(parsed.characters)
+    }
+
     public static func render(_ doc: TipTapNode) -> AttributedString {
         var result = AttributedString()
         let blocks = doc.content ?? []
