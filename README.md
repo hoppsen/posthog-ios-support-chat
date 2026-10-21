@@ -239,7 +239,7 @@ Team replies in the inbox
 |---|---|
 | Trigger | Event `$conversation_message_sent`, filtered to `channel_source = widget` and `author_type = team` |
 | Get conversation ticket | Ticket ID `{event.properties.ticket_id}` (the default), output variable `ticket` |
-| Capture a PostHog event | Event `support:reply_received`, distinct ID `{variables.ticket.distinct_id}`, properties `ticket_id`, `ticket_number`, `message_id`, `message_content` copied from `{event.properties.*}` |
+| Capture a PostHog event | Event `support:reply_received`, distinct ID `{variables.ticket.distinct_id}`, properties `ticket_id`, `ticket_number`, `message_id` copied from `{event.properties.*}`, and `message_content` as `{replaceAll(event.properties.message_content, '\\', '')}` |
 
 **Workflow B** — "Support reply push (iOS)":
 
@@ -254,7 +254,7 @@ Expect a minute or two between the reply and the push: the captured event goes t
 
 Select only the production channel in a live workflow. Tokens carry no APNs environment, so with a sandbox channel selected too, every push is also sent to the wrong environment and logs a `BadDeviceToken` error. Add the sandbox channel only while testing a build run from Xcode.
 
-Inbox replies are markdown, so a preview can show escapes such as `\.` (the workflow's Liquid templating rejects backslashes, so they cannot be stripped there). A preview also puts up to 180 characters of the reply on the lock screen. Use a generic body such as "You have a new reply" if replies may be sensitive.
+Inbox replies are markdown, and the inbox escapes some punctuation (`\.`, `\[`, `\]`), so workflow A strips every backslash when it copies the text. Workflow B's Liquid templating rejects backslashes, so it can't be done there. A backslash someone actually typed is lost from the preview too (never from the chat), and markdown links and `**bold**` still show as written. A preview also puts up to 180 characters of the reply on the lock screen. Use a generic body such as "You have a new reply" if replies may be sensitive.
 
 **2. The app**
 

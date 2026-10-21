@@ -106,8 +106,14 @@ Findings:
   customer's `distinct_id`: the id sent with the message that created the
   ticket (`SupportChatContextProvider.distinctId`).
 - `message_content` is the reply's markdown, truncated to 1,000 characters.
-  The workflow's Liquid templating rejects a backslash in any string literal,
-  so markdown escapes (`\.`) cannot be stripped in the push body.
+  The inbox editor escapes `.`, `[` and `]` (`\.`, `\[date\]`) but not `?`,
+  `,`, `"` or `$`; links arrive as `[text](url)` and bold as `**text**`. The
+  push body's Liquid templating rejects a backslash in any string literal, so
+  workflow A's capture step strips escapes with Hog instead:
+  `{replaceAll(event.properties.message_content, '\\', '')}` (`'\\'` is one
+  backslash). It removes typed backslashes too; an exact
+  "backslash before punctuation" unescape would need ~35 nested `replaceAll`
+  calls, since Hog has no regex replace. Links and bold stay raw.
 - posthog-ios registers device tokens on its own (3.69.0+ only; verified
   in a SwiftUI app, though the token can arrive a launch later). A device
   without a token logs `No active APNS device token found for distinct_id`

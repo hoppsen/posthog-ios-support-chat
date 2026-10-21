@@ -85,7 +85,7 @@ MCP: `workflows-create` with this body. It is created as a draft.
               "ticket_id": "{event.properties.ticket_id}",
               "ticket_number": "{event.properties.ticket_number}",
               "message_id": "{event.properties.message_id}",
-              "message_content": "{event.properties.message_content}",
+              "message_content": "{replaceAll(event.properties.message_content, '\\\\', '')}",
               "channel_source": "{event.properties.channel_source}"
             }
           }
@@ -158,7 +158,7 @@ Notes on the push step:
 
 - **Templating differs per input.** `body` is Liquid: `{{ … }}` with `"templating": "liquid"`. Every other input is Hog: `{…}`. The wrong brace style is sent as literal text, without an error.
 - **The custom data keys** (`type: support_reply`, `ticket_id`) must match `SupportChatNotification`. PostHog places them at the top level of the APNs payload.
-- **The body** puts up to 180 characters of the reply on the lock screen. Use a generic text such as "You have a new reply" if replies may be sensitive. Inbox replies are markdown, so escapes such as `\.` can show; Liquid rejects backslashes, so they cannot be stripped here.
+- **The body** puts up to 180 characters of the reply on the lock screen. Use a generic text such as "You have a new reply" if replies may be sensitive. Inbox replies are markdown, and the inbox escapes some punctuation (`\.`, `\[`, `\]`). Workflow A strips every backslash when it copies the text (Liquid here rejects backslashes, so it can't be done in this step); a backslash someone actually typed is lost from the preview too, never from the chat. Markdown links and `**bold**` still show as written.
 - **The badge** is set to 1. The app should clear it when the chat opens.
 - **Never send** `bytecode`, `order` or a top-level `trigger`; the server compiles and derives those.
 
