@@ -43,16 +43,19 @@ public extension SupportChatClient {
     /// thread), a banner for any other, and a ticket refresh so the
     /// conversation list shows the new unread badge.
     ///
-    /// Takes the ticket id rather than the notification, so a `nonisolated`
-    /// delegate method only sends a `String` to the main actor:
+    /// Call it from a main-actor delegate method (a `@preconcurrency
+    /// UNUserNotificationCenterDelegate` conformance on the app delegate).
+    /// Don't make the method `nonisolated`: its completion handler would run
+    /// off the main thread, which aborts the app when a tap brings it to the
+    /// foreground.
     ///
     /// ```swift
-    /// nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
-    ///                                         willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
+    /// func userNotificationCenter(_ center: UNUserNotificationCenter,
+    ///                             willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
     ///     guard let ticketId = SupportChatNotification.ticketId(from: notification.request.content.userInfo) else {
     ///         return [.banner, .list, .sound]
     ///     }
-    ///     return await supportChatClient.presentationOptions(forReplyTo: ticketId)
+    ///     return supportChatClient.presentationOptions(forReplyTo: ticketId)
     /// }
     /// ```
     func presentationOptions(forReplyTo ticketId: String) -> UNNotificationPresentationOptions {

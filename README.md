@@ -310,7 +310,7 @@ enum SupportChatService {
     }
 }
 
-final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+final class AppDelegate: NSObject, UIApplicationDelegate, @preconcurrency UNUserNotificationCenterDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         // Before launch finishes, or a tap that cold-launches the app is lost.
@@ -320,20 +320,22 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         return true
     }
 
-    // `nonisolated` with only the ticket id crossing to the main actor keeps
-    // Swift 6 happy: UNNotification is not Sendable.
-    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
-                                            willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
+    // Keep these main-actor isolated (the `@preconcurrency` conformance above), never
+    // `nonisolated`: an async delegate method's completion handler runs where the method
+    // finishes, and when a tap brings the app to the foreground, UIKit takes a snapshot
+    // that aborts the app off the main thread.
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
         guard let ticketId = SupportChatNotification.ticketId(from: notification.request.content.userInfo) else {
             return [.banner, .list, .sound] // your other notifications
         }
-        return await SupportChatService.client.presentationOptions(forReplyTo: ticketId)
+        return SupportChatService.client.presentationOptions(forReplyTo: ticketId)
     }
 
-    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
-                                            didReceive response: UNNotificationResponse) async {
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                didReceive response: UNNotificationResponse) async {
         guard let ticketId = SupportChatNotification.ticketId(from: response.notification.request.content.userInfo) else { return }
-        await SupportChatService.client.openReplyNotification(ticketId: ticketId)
+        SupportChatService.client.openReplyNotification(ticketId: ticketId)
     }
 }
 
