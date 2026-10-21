@@ -77,11 +77,15 @@ Findings that go beyond the TypeScript types in posthog-js:
 Push is sent by PostHog Workflows (see the README recipe). The package
 covers everything on the device that does not depend on the app: the
 permission row, provisional permission on a new ticket, APNs registration,
-foreground banners (`presentationOptions(forReplyTo:)`), badge clearing and
-tap routing (`ReplyNotifications.swift`, UI target, since none of it is
-transport). The app keeps the notification delegate — one per app, shared
-with its other notifications and posthog-ios — and decides how a tap
-presents the chat. Findings:
+foreground banners (`presentationOptions(forReplyTo:)`), badge clearing, the
+permission state behind an app's Settings row (`SupportChatNotificationPermission`,
+observable, shared with the chat row) and opening a tapped reply in an
+`.alert`-level overlay window (`SupportChatOverlay.swift`). All of it is in the
+UI target, since none of it is transport; per-client UI state lives in
+`SupportChatUIState` because extensions cannot add stored properties. The app
+keeps the notification delegate — one per app, shared with its other
+notifications and posthog-ios — the analytics mapping, and its rows' look.
+Findings:
 
 - `$conversation_message_sent` (a team reply) is a regular event, but it
   belongs to the **replying PostHog user** (its `distinct_id` is theirs).
