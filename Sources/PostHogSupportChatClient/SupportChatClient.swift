@@ -28,6 +28,9 @@ public final class SupportChatClient {
         /// person profile as `email` and `name`, the unprefixed properties
         /// PostHog uses to display a person.
         case identificationSubmitted(email: String?, name: String?)
+        /// The user tapped "Turn on" in the chat's "Get notified when we
+        /// reply" row and answered the permission dialog.
+        case notificationPermissionRequested(granted: Bool)
     }
 
     public private(set) var state: State = .idle
@@ -76,6 +79,12 @@ public final class SupportChatClient {
     /// polling delivers that reply on its own.
     public var visibleTicketId: String? {
         pollTask == nil ? nil : currentTicketId
+    }
+
+    /// Reports an event the chat UI observed (in the `PostHogSupportChat`
+    /// target) through `onEvent`.
+    package func report(_ event: Event) {
+        onEvent?(event)
     }
 
     // MARK: - Dashboard-configured copy

@@ -18,7 +18,7 @@ The hand-off goes through event ingestion, so expect **a minute or two** between
 
 ## Prerequisites
 
-- **The app:** posthog-ios **3.69.0+**, the Push Notifications capability, and the app wiring from the README (permission, `registerForRemoteNotifications()`, notification delegate). `SupportChatContextProvider.distinctId` must return `PostHogSDK.shared.getDistinctId()`.
+- **The app:** posthog-ios **3.69.0+**, the Push Notifications capability, and the app wiring from the README (`offersReplyNotifications: true`, `refreshPushRegistration()`, notification delegate). `SupportChatContextProvider.distinctId` must return `PostHogSDK.shared.getDistinctId()`.
 - **The PostHog project:** Support enabled, and an **APNs channel** (Workflows → Channels) for the app's bundle id. Create a production channel; a sandbox channel is only for testing builds run from Xcode. Leave **Identity verification** disabled for anonymous users.
 
 ## 1. Find the channel id
