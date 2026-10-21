@@ -65,7 +65,7 @@ struct TicketRow: View {
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                (ticket.lastMessage.map(Text.init)
+                (ticket.lastMessage.map { Text(TipTapRenderer.plainPreview($0)) }
                     ?? Text("No messages", bundle: .module,
                             comment: "Placeholder preview in the conversation list for a ticket without messages."))
                     .lineLimit(2)

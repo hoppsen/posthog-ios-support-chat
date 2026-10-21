@@ -112,4 +112,18 @@ final class ReplyNotificationsTests: XCTestCase {
         routing.chatDisappeared()
         XCTAssertTrue(routing.isChatPresented)
     }
+
+    // MARK: - Conversation list preview
+
+    func testPreviewResolvesMarkdownEscapesLinksAndEmphasis() {
+        XCTAssertEqual(TipTapRenderer.plainPreview(#"nichts\. bei dir?"#), "nichts. bei dir?")
+        XCTAssertEqual(TipTapRenderer.plainPreview(#"Expires on \[date\]"#), "Expires on [date]")
+        XCTAssertEqual(TipTapRenderer.plainPreview("Mail [marcel@example\\.com](mailto:marcel@example.com) **now**"),
+                       "Mail marcel@example.com now")
+    }
+
+    func testPreviewKeepsPlainTextAndLineBreaks() {
+        XCTAssertEqual(TipTapRenderer.plainPreview("How do I cancel?"), "How do I cancel?")
+        XCTAssertEqual(TipTapRenderer.plainPreview("Hi,\nthanks"), "Hi,\nthanks")
+    }
 }
