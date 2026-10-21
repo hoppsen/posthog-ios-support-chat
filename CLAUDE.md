@@ -175,6 +175,15 @@ first-class mobile support upstream rather than ship the browser-oriented
 flow. The endpoint shapes and requirements above are the hard-won part —
 start from them if you re-add it.
 
+## Unread count
+
+`unreadCount` sums the per-ticket `unread_count` from `GET .../tickets` (replies
+the customer hasn't seen); opening a conversation's messages marks it read
+server-side. `refreshUnreadCount()` exists for badges outside the chat and
+skips the network when the Keychain holds no session (`SessionStore.hasSession`),
+which is the case for most users, so a badge on every Settings screen costs
+nothing until someone writes in.
+
 ## Localization
 
 UI strings live in `Sources/PostHogSupportChat/Resources/Localizable.xcstrings`
