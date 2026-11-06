@@ -72,7 +72,7 @@ Findings that go beyond the TypeScript types in posthog-js:
   every request for projects that restrict domains; leave it nil when the
   project's domain list is empty (empty = allow all).
 
-## Push notifications for replies (verified October 2026)
+## Push notifications for replies (verified October and November 2026)
 
 Push is sent by PostHog Workflows (see the README recipe). The package
 covers everything on the device that does not depend on the app: the
@@ -89,31 +89,28 @@ Findings:
 
 - `$conversation_message_sent` (a team reply) is a regular event, but it
   belongs to the **replying PostHog user** (its `distinct_id` is theirs).
-- A push step reads device tokens from the person the workflow run belongs
-  to (`globals.person`); its required "Distinct ID" input is only used in
-  log messages. So a push in a workflow triggered by a reply searches the
-  team member's devices — while logging the customer's id in
-  `No active APNS device token found for distinct_id: …`. A run cannot
-  switch person, hence two workflows: A (reply → "Get conversation ticket"
-  → capture `support:reply_received` with the ticket's `distinct_id`) and
-  B (that event → push). `postHogCapture` events do trigger workflows; loop
-  protection only stops chains after 10 hops. The hand-off costs one
-  ingestion round trip (~100 s observed). Reported upstream as
-  [PostHog/posthog#120326](https://github.com/PostHog/posthog/issues/120326);
-  once the push step honors its Distinct ID, this collapses back into one
-  workflow with no change to the package or apps.
+- A push step sends to whatever its "Distinct ID" input names (since
+  [PostHog/posthog#120237](https://github.com/PostHog/posthog/pull/120237),
+  deployed 2026-10-22), so one workflow does it all: reply → "Get
+  conversation ticket" → push with `{variables.ticket.distinct_id}`. The
+  reply event now also carries `customer_distinct_id`. Before that fix the
+  step delivered to the run's own person, the team member, and logged the
+  customer's id only (reported as
+  [PostHog/posthog#120326](https://github.com/PostHog/posthog/issues/120326));
+  the workaround was a second workflow triggered by a captured
+  `support:reply_received` event, which cost one ingestion round trip
+  (~100 s observed). All projects were collapsed to the single workflow on
+  2026-11-06; `PostHogWorkflows.md` keeps the migration steps.
 - "Get conversation ticket" (`template-posthog-get-ticket`) returns the
   customer's `distinct_id`: the id sent with the message that created the
   ticket (`SupportChatContextProvider.distinctId`).
 - `message_content` is the reply's markdown, truncated to 1,000 characters.
-  The inbox editor escapes `.`, `[` and `]` (`\.`, `\[date\]`) but not `?`,
-  `,`, `"` or `$`; links arrive as `[text](url)` and bold as `**text**`. The
-  push body's Liquid templating rejects a backslash in any string literal, so
-  workflow A's capture step strips escapes with Hog instead:
-  `{replaceAll(event.properties.message_content, '\\', '')}` (`'\\'` is one
-  backslash). It removes typed backslashes too; an exact
-  "backslash before punctuation" unescape would need ~35 nested `replaceAll`
-  calls, since Hog has no regex replace. Links and bold stay raw.
+  The inbox editor escapes `.`, `!`, `[` and `]` (`\.`, `\[date\]`) but not
+  `?`, `,`, `"` or `$`; links arrive as `[text](url)` and bold as `**text**`.
+  The push body strips them in Liquid: `replace: "\\", ""` before
+  `strip_html | truncate: 180` (verified November 2026; an earlier note
+  that Liquid rejected a backslash literal no longer holds). It removes
+  typed backslashes too. Links and bold stay raw.
 - posthog-ios registers device tokens on its own (3.69.0+ only; verified
   in a SwiftUI app, though the token can arrive a launch later). A device
   without a token logs `No active APNS device token found for distinct_id`
@@ -123,8 +120,11 @@ Findings:
   pre-identify id stored on a ticket (inferred from PostHog's code, untested).
 - Tokens carry no APNs environment. With both a production and a sandbox
   channel selected, every token is sent to both; the wrong environment
-  answers BadDeviceToken, which PostHog logs as an `invalid_token` error
-  (not pruned). Live workflows should select the production channel only.
+  answers BadDeviceToken, which PostHog logs as an error and, since
+  #120237, prunes from the person. A user who ran both a TestFlight and an
+  Xcode build has one token of each, so `accepted for 1 of 2 device(s)`
+  plus one BadDeviceToken line is the normal log. Live workflows should
+  select the production channel only.
 - PostHog spreads the push step's custom `data` into the top level of the
   APNs payload beside `aps` (and FCM data lands at the top level of
   `userInfo` too). The `posthog` key is reserved for open-tracking
