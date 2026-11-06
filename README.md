@@ -209,38 +209,27 @@ The package stays dependency-free: posthog-ios uploads the device token on its o
 
 The step-by-step setup, including the exact workflow definitions to create over PostHog MCP, test-run and verification steps, and troubleshooting, is in [PostHogWorkflows.md](PostHogWorkflows.md).
 
-A push step delivers to the person the workflow run belongs to — its "Distinct ID" field only appears in log messages ([PostHog/posthog#120326](https://github.com/PostHog/posthog/issues/120326)). A reply event belongs to the team member who replied, so a single workflow on it would look for the team member's device. Two workflows hand the reply over to the customer instead:
+One workflow does the whole job: it triggers on the team's reply, looks up the ticket, and pushes to the customer the ticket belongs to.
 
 ```
 Team replies in the inbox
   → $conversation_message_sent        (belongs to the team member)
-      → Workflow A: Get ticket → capture support:reply_received for the customer
-          → support:reply_received    (belongs to the customer)
-              → Workflow B: push to the customer's device
+      → Workflow "Support reply → push (iOS)": Get ticket → push to the ticket's customer
 ```
-
-**Workflow A** — "Support reply → customer event":
 
 | Step | Configuration |
 |---|---|
 | Trigger | Event `$conversation_message_sent`, filtered to `channel_source = widget` and `author_type = team` |
 | Get conversation ticket | Ticket ID `{event.properties.ticket_id}` (the default), output variable `ticket` |
-| Capture a PostHog event | Event `support:reply_received`, distinct ID `{variables.ticket.distinct_id}`, properties `ticket_id`, `ticket_number`, `message_id` copied from `{event.properties.*}`, and `message_content` as `{replaceAll(event.properties.message_content, '\\', '')}` |
+| Push notification | Distinct ID `{variables.ticket.distinct_id}`, your **production** APNs channel, a title such as "New reply from support", body `{{ event.properties.message_content \| replace: "\\", "" \| strip_html \| truncate: 180 }}`, custom data `{"type": "support_reply", "ticket_id": "{event.properties.ticket_id}"}` |
 
-**Workflow B** — "Support reply push (iOS)":
+The reply event belongs to the team member who replied, but the push step sends to whatever its Distinct ID input names, so the ticket's distinct id is what routes the push to the customer. That id is whatever your `SupportChatContextProvider.distinctId` returned when the ticket was created, so it must return `PostHogSDK.shared.getDistinctId()`, the id the SDK registers the device under. The custom data keys must match `SupportChatNotification`. The push leaves within seconds of the reply.
 
-| Step | Configuration |
-|---|---|
-| Trigger | Event `support:reply_received` |
-| Push notification | Distinct ID `{event.distinct_id}`, your **production** APNs channel, a title such as "New reply from support", body `{{ event.properties.message_content \| strip_html \| truncate: 180 }}`, custom data `{"type": "support_reply", "ticket_id": "{event.properties.ticket_id}"}` |
-
-The ticket carries the customer's distinct id: whatever your `SupportChatContextProvider.distinctId` returned when the ticket was created, so it must return `PostHogSDK.shared.getDistinctId()`, the id the SDK registers the device under. The custom data keys must match `SupportChatNotification`.
-
-Expect a minute or two between the reply and the push: the captured event goes through PostHog's ingestion before it triggers workflow B. Once the push step honors its Distinct ID, the push moves into workflow A (`{variables.ticket.distinct_id}`) and the delay disappears; the app side stays the same.
+Until November 2026 the push step ignored its Distinct ID input ([PostHog/posthog#120326](https://github.com/PostHog/posthog/issues/120326)) and this needed two workflows chained through a captured `support:reply_received` event, with a minute or two of delay. PostHog fixed it in [#120237](https://github.com/PostHog/posthog/pull/120237); [PostHogWorkflows.md](PostHogWorkflows.md) describes how to collapse an existing pair.
 
 Select only the production channel in a live workflow. Tokens carry no APNs environment, so with a sandbox channel selected too, every push is also sent to the wrong environment and logs a `BadDeviceToken` error. Add the sandbox channel only while testing a build run from Xcode.
 
-Inbox replies are markdown, and the inbox escapes some punctuation (`\.`, `\[`, `\]`), so workflow A strips every backslash when it copies the text. Workflow B's Liquid templating rejects backslashes, so it can't be done there. A backslash someone actually typed is lost from the preview too (never from the chat), and markdown links and `**bold**` still show as written. A preview also puts up to 180 characters of the reply on the lock screen. Use a generic body such as "You have a new reply" if replies may be sensitive.
+Inbox replies are markdown, and the inbox escapes some punctuation (`\.`, `\!`, `\[`, `\]`), so the push body strips every backslash with Liquid's `replace` before truncating. A backslash someone actually typed is lost from the preview too (never from the chat), and markdown links and `**bold**` still show as written. A preview also puts up to 180 characters of the reply on the lock screen. Use a generic body such as "You have a new reply" if replies may be sensitive.
 
 **2. The app**
 
